@@ -1,15 +1,8 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Calendar, User, Trophy, ExternalLink, Shirt } from "lucide-react";
-
-function formatDate(iso) {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" });
-  } catch { return iso; }
-}
+import { ArrowLeft, MapPin, Calendar, User, ExternalLink, Shirt } from "lucide-react";
 
 function formatMatchDate(iso) {
   if (!iso) return "";
@@ -30,12 +23,13 @@ function age(dob) {
 const FORM_COLORS = { V: "#10B981", N: "#F59E0B", P: "#EF4444", "—": "#999" };
 
 export default function TeamPage({ params }) {
-  const { id } = use(params);
+  const id = params?.id;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!id) return;
     async function load() {
       setLoading(true);
       try {
@@ -66,20 +60,27 @@ export default function TeamPage({ params }) {
     );
   }
 
-  if (error) {
+  if (error || !data) {
     return (
       <div className="min-h-screen w-full" style={{ background: "#F4EFE6", fontFamily: "Georgia, 'Times New Roman', serif" }}>
         <BackHeader />
         <div className="max-w-5xl mx-auto px-4 py-12 text-center">
           <p className="text-2xl mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Squadra non trovata</p>
-          <p className="text-sm" style={{ color: "#666" }}>{error}</p>
+          <p className="text-sm" style={{ color: "#666" }}>{error || "Dati non disponibili"}</p>
+          <Link href="/" className="inline-block mt-4 px-4 py-2 text-[11px] uppercase tracking-widest font-bold" style={{ background: "#E91D5C", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
+            Torna alla home
+          </Link>
         </div>
       </div>
     );
   }
 
-  const { info, squad, past, upcoming, form } = data;
-  const totalPlayers = Object.values(squad).reduce((sum, arr) => sum + arr.length, 0);
+  const info = data.info || {};
+  const squad = data.squad || {};
+  const past = data.past || [];
+  const upcoming = data.upcoming || [];
+  const form = data.form || [];
+  const totalPlayers = Object.values(squad).reduce((sum, arr) => sum + (arr?.length || 0), 0);
 
   return (
     <div className="min-h-screen w-full" style={{ background: "#F4EFE6", fontFamily: "Georgia, 'Times New Roman', serif" }}>
@@ -88,7 +89,6 @@ export default function TeamPage({ params }) {
 
       <BackHeader />
 
-      {/* HERO */}
       <div className="relative" style={{ background: "#0A0A0A" }}>
         <div className="max-w-5xl mx-auto px-4 py-6">
           <div className="flex items-center gap-4">
@@ -99,7 +99,7 @@ export default function TeamPage({ params }) {
             )}
             <div className="flex-1 min-w-0 text-white">
               <h1 className="text-2xl sm:text-4xl font-black leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif", letterSpacing: "-0.02em" }}>
-                {info.name}
+                {info.name || "—"}
               </h1>
               {info.tla && (
                 <span className="inline-block mt-1 text-[10px] uppercase tracking-[0.3em] font-bold px-2 py-0.5" style={{ background: "#E91D5C", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
@@ -118,8 +118,6 @@ export default function TeamPage({ params }) {
       </div>
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 py-5">
-
-        {/* INFO CARD */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
           <InfoCell icon={<Calendar size={12} />} label="Fondato" value={info.founded || "—"} />
           <InfoCell icon={<MapPin size={12} />} label="Stadio" value={info.venue || "—"} />
@@ -127,7 +125,6 @@ export default function TeamPage({ params }) {
           <InfoCell icon={<Shirt size={12} />} label="Rosa" value={`${totalPlayers} giocatori`} />
         </div>
 
-        {/* COMPETIZIONI ATTIVE */}
         {info.competitions && info.competitions.length > 0 && (
           <div className="mb-6">
             <SectionTitle label="Competizioni" accent="#0072CE" />
@@ -142,13 +139,12 @@ export default function TeamPage({ params }) {
           </div>
         )}
 
-        {/* FORMA RECENTE */}
         {form.length > 0 && (
           <div className="mb-6">
             <SectionTitle label="Forma" accent="#E91D5C" />
             <div className="flex items-center gap-1.5">
               {form.map((f, i) => (
-                <div key={i} className="w-9 h-9 flex items-center justify-center font-black text-sm" style={{ background: FORM_COLORS[f.result], color: "#fff", fontFamily: "system-ui, sans-serif" }} title={`${f.match.home} ${f.match.homeScore}-${f.match.awayScore} ${f.match.away}`}>
+                <div key={i} className="w-9 h-9 flex items-center justify-center font-black text-sm" style={{ background: FORM_COLORS[f.result] || "#999", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
                   {f.result}
                 </div>
               ))}
@@ -159,7 +155,6 @@ export default function TeamPage({ params }) {
           </div>
         )}
 
-        {/* PROSSIME PARTITE */}
         {upcoming.length > 0 && (
           <div className="mb-6">
             <SectionTitle label="Prossime Partite" accent="#0072CE" count={upcoming.length} />
@@ -169,7 +164,6 @@ export default function TeamPage({ params }) {
           </div>
         )}
 
-        {/* ULTIME PARTITE */}
         {past.length > 0 && (
           <div className="mb-6">
             <SectionTitle label="Ultime Partite" accent="#0A0A0A" count={past.length} />
@@ -179,10 +173,9 @@ export default function TeamPage({ params }) {
           </div>
         )}
 
-        {/* ROSA */}
         <SectionTitle label={`Rosa · ${totalPlayers} giocatori`} accent="#E91D5C" />
         {Object.entries(squad).map(([role, players]) => {
-          if (players.length === 0) return null;
+          if (!players || players.length === 0) return null;
           return (
             <div key={role} className="mb-5">
               <h3 className="text-[11px] uppercase tracking-[0.3em] font-black mb-2 px-2 py-1" style={{ background: "#0A0A0A", color: "#F4EFE6", display: "inline-block", fontFamily: "system-ui, sans-serif" }}>
@@ -210,15 +203,10 @@ export default function TeamPage({ params }) {
           ✦ Dati: Football-Data.org ✦
         </p>
       </footer>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,700&display=swap');
-      `}</style>
     </div>
   );
 }
 
-// ============ COMPONENTS ============
 function BackHeader() {
   return (
     <header className="sticky top-0 z-40 border-b-4" style={{ background: "#0A0A0A", borderColor: "#E91D5C" }}>
@@ -263,7 +251,7 @@ function InfoCell({ icon, label, value }) {
 function SmallMatchCard({ match, state }) {
   const showScore = state === "finished";
   return (
-    <Link href={`/team/${match.homeId}`} className="block transition hover:translate-x-1" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
+    <div className="block" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
       <div className="px-3 py-2.5">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
@@ -293,7 +281,7 @@ function SmallMatchCard({ match, state }) {
           </div>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
