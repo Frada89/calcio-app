@@ -28,9 +28,6 @@ export const FANTA_FEEDS = [
   { id: "tmwfanta", name: "TMW Fanta", url: "https://www.tuttomercatoweb.com/fantanews/rss", color: "#0D47A1", accent: "TMW-F" },
 ];
 
-// ============================================
-// SITI FANTA UTILI (link rapidi)
-// ============================================
 export const FANTA_LINKS = [
   { name: "Fantacalcio.it", url: "https://www.fantacalcio.it", desc: "Quotazioni, voti, probabili", color: "#0072CE" },
   { name: "SOS Fanta", url: "https://www.sosfanta.com", desc: "Consigli e formazioni", color: "#E91D5C" },
@@ -43,63 +40,83 @@ export const FANTA_LINKS = [
 ];
 
 // ============================================
-// RADIO SPORTIVE
+// RADIO LIVE — apre il sito ufficiale
 // ============================================
 export const RADIOS = [
+  { id: "sportiva", name: "Radio Sportiva", desc: "La radio nazionale del calcio", site: "https://www.radiosportiva.com/streaming", color: "#E91D5C" },
+  { id: "raisport", name: "Rai Radio Sport", desc: "RAI - Sport e attualità", site: "https://www.raiplaysound.it/dirette/rairadiosport", color: "#0072CE" },
+  { id: "tmwradio", name: "TMW Radio", desc: "Tutto Mercato Web Radio", site: "https://www.tmwradio.com/diretta", color: "#0D47A1" },
+  { id: "centrosuono", name: "Centro Suono Sport", desc: "La voce del tifoso romano", site: "https://www.centrosuonosport.it", color: "#FFD700" },
+  { id: "kissrosa", name: "Kiss Kiss Napoli", desc: "La radio del Napoli", site: "https://www.radiokisskissnapoli.it/diretta-2/", color: "#0F75BC" },
+  { id: "rmc", name: "RMC Sport", desc: "Radio Monte Carlo Sport", site: "https://www.radiomontecarlo.net/sezioni/2090/sport", color: "#000000" },
+];
+
+// ============================================
+// PODCAST CALCIO ITALIANI — embed Spotify
+// ============================================
+export const PODCASTS = [
   {
-    id: "sportiva",
-    name: "Radio Sportiva",
-    desc: "La radio nazionale del calcio",
-    stream: "https://playerservices.streamtheworld.com/api/livestream-redirect/RADIOSPORTIVA.mp3",
-    fallbackStream: "https://radiosportiva-lh.akamaihd.net/i/RadioSportiva_1@189857/master.m3u8",
-    site: "https://www.radiosportiva.com",
-    color: "#E91D5C",
-    icon: "📻",
-  },
-  {
-    id: "raisport",
-    name: "Rai Radio Sport",
-    desc: "RAI - Sport e attualità",
-    stream: "https://icestreaming.rai.it/12.mp3",
-    site: "https://www.raiplaysound.it/rairadiosport",
+    id: "skyunplugged",
+    name: "Sky Calcio Unplugged",
+    author: "Sky Sport · Lisa Offside, Di Marzio, Borghi",
+    desc: "Il talk del weekend tra Serie A, coppe e fantacalcio",
+    spotifyId: "1l0uDqW9q8sDvVlFAV6Hpf",
     color: "#0072CE",
-    icon: "📻",
+    badge: "Sky",
   },
   {
-    id: "tmwradio",
-    name: "TMW Radio",
-    desc: "Tutto Mercato Web Radio",
-    stream: "https://tmwradio.fluidstream.eu/tmwradio.mp3",
-    site: "https://www.tmwradio.com",
-    color: "#0D47A1",
-    icon: "📻",
+    id: "skymercato",
+    name: "Sky Calciomercato",
+    author: "Sky Sport",
+    desc: "L'edizione di calciomercato di Sky Sport 24",
+    spotifyId: "7tUAIFi7lGQOOIYJp0eUEG",
+    color: "#0072CE",
+    badge: "Sky",
   },
   {
-    id: "centrosuono",
-    name: "Centro Suono Sport",
-    desc: "La radio del tifoso romano",
-    stream: "https://centrosuonosport.fluidstream.eu/csport.mp3",
-    site: "https://www.centrosuonosport.it",
-    color: "#FFD700",
-    icon: "📻",
+    id: "lariserva",
+    name: "La Riserva",
+    author: "Fenomeno · Atturo, Manusia, Conte",
+    desc: "L'attualità del calcio raccontata con leggerezza e competenza",
+    spotifyId: "1OixKemHxllz2VqQ2L86Yi",
+    color: "#FF6B00",
+    badge: "Top",
   },
   {
-    id: "kissrosa",
-    name: "Kiss Kiss Napoli",
-    desc: "La radio del Napoli",
-    stream: "https://onair26.xdevel.com/proxy/kkn?mp=/stream",
-    site: "https://www.radiokisskissnapoli.it",
-    color: "#0F75BC",
-    icon: "📻",
+    id: "pendolino",
+    name: "Pendolino",
+    author: "Fenomeno · Ultimo Uomo",
+    desc: "Calciomercato vivace e irriverente",
+    spotifyId: "57S9Oz4lpyrFrfX5yYTEgY",
+    color: "#E91D5C",
+    badge: "Mercato",
   },
   {
-    id: "rete105",
-    name: "RMC Sport",
-    desc: "Radio Monte Carlo Sport",
-    stream: "https://edge.rmc-streaming.com/rmcsport.mp3",
-    site: "https://www.rmcsport.fr",
-    color: "#000000",
-    icon: "📻",
+    id: "calcioconta",
+    name: "Il Calcio che Conta",
+    author: "Storia del calcio",
+    desc: "Storia del calcio: partite e azioni che hanno cambiato lo sport",
+    spotifyId: "23kGqlSgzjmKdyVnDzNPeV",
+    color: "#1B2842",
+    badge: "Storia",
+  },
+  {
+    id: "calciogiuoco",
+    name: "Il Calcio non è un Giuoco",
+    author: "DMTC Sport · Bacconi, Caputi",
+    desc: "Calcio analitico: tattica, dati, intelligenza artificiale",
+    spotifyId: "3UDOd2igdF8VSYpnrRbNMJ",
+    color: "#00853E",
+    badge: "Tattica",
+  },
+  {
+    id: "calciothesquad",
+    name: "CALCIO.",
+    author: "The Squad",
+    desc: "Tattica, tecnica, cose di campo da chi il calcio lo vive",
+    spotifyId: "2gom39VXuXoj0ecFbYfkVa",
+    color: "#592C82",
+    badge: "Tecnica",
   },
 ];
 
