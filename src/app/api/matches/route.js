@@ -33,8 +33,10 @@ function normalizeMatch(m) {
   return {
     id: m.id,
     home: m.homeTeam?.shortName || m.homeTeam?.name || "—",
+    homeId: m.homeTeam?.id,
     homeBadge: m.homeTeam?.crest,
     away: m.awayTeam?.shortName || m.awayTeam?.name || "—",
+    awayId: m.awayTeam?.id,
     awayBadge: m.awayTeam?.crest,
     homeScore: m.score?.fullTime?.home ?? null,
     awayScore: m.score?.fullTime?.away ?? null,
@@ -63,7 +65,6 @@ export async function GET(request) {
     const league = LEAGUES.find((l) => l.id === leagueId);
     const compId = league?.footballData || "SA";
 
-    // Range esteso: -10 giorni / +30 giorni per calendario completo
     const today = new Date();
     const from = new Date(today.getTime() - 10 * 86400000).toISOString().split("T")[0];
     const to = new Date(today.getTime() + 30 * 86400000).toISOString().split("T")[0];
@@ -83,7 +84,7 @@ export async function GET(request) {
     const upcoming = matches
       .filter((m) => ["SCHEDULED", "TIMED"].includes(m.status) && new Date(m.date).getTime() > now)
       .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .slice(0, 30); // più ampio per il calendario
+      .slice(0, 30);
 
     const result = { live, past, upcoming };
     cache.set(cacheKey, { data: result, time: Date.now() });
