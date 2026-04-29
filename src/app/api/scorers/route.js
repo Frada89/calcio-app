@@ -2,11 +2,11 @@ import { LEAGUES } from "@/lib/config";
 
 const FD = "https://api.football-data.org/v4";
 let cache = new Map();
-const CACHE_MS = 10 * 60 * 1000; // 10 minuti
+const CACHE_MS = 10 * 60 * 1000;
 
 async function fdFetch(endpoint) {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
-  if (!apiKey) throw new Error("FOOTBALL_DATA_API_KEY mancante. Aggiungi la variabile su Vercel.");
+  if (!apiKey) throw new Error("FOOTBALL_DATA_API_KEY mancante.");
   try {
     const res = await fetch(`${FD}${endpoint}`, {
       headers: { "X-Auth-Token": apiKey },
@@ -45,6 +45,7 @@ export async function GET(request) {
       pos: i + 1,
       player: s.player?.name || "—",
       team: s.team?.shortName || s.team?.name || "—",
+      teamId: s.team?.id,
       teamBadge: s.team?.crest,
       goals: s.goals || 0,
       assists: s.assists || 0,
