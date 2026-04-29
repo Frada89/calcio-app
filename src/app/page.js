@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import Link from "next/link";
 import {
   RefreshCw, Clock, ExternalLink, Zap, Wifi, WifiOff,
   Search, X, Trophy, Users, Newspaper, Activity, BarChart3, Target,
@@ -46,29 +47,23 @@ export default function Home() {
   const [teamFilter, setTeamFilter] = useState(null);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-
   const [articles, setArticles] = useState([]);
   const [newsLoading, setNewsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [newCount, setNewCount] = useState(0);
   const [online, setOnline] = useState(true);
-
   const [liveMatches, setLiveMatches] = useState([]);
   const [pastMatches, setPastMatches] = useState([]);
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [matchesError, setMatchesError] = useState(null);
-
   const [standings, setStandings] = useState([]);
   const [scorers, setScorers] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
   const [tableError, setTableError] = useState(null);
-
   const [fantaArticles, setFantaArticles] = useState([]);
   const [fantaLoading, setFantaLoading] = useState(false);
-
   const [activePodcast, setActivePodcast] = useState(null);
-
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [countdown, setCountdown] = useState(120);
   const knownIdsRef = useRef(new Set());
@@ -323,15 +318,13 @@ export default function Home() {
         <p className="text-[10px] uppercase tracking-[0.3em] text-center" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
           ✦ News: Sky · Gazzetta · CDS · Tuttosport · ANSA · CM · TMW ✦<br />
           ✦ Risultati & Tabelle: Football-Data.org ✦<br />
-          ✦ Fanta: SOS Fanta · Fantacalcio.it · FantaMaster ✦<br />
-          ✦ Podcast: Spotify ✦
+          ✦ Tap su una squadra per vedere rosa, partite e statistiche ✦
         </p>
       </footer>
     </div>
   );
 }
 
-// ============ TABS ============
 function NewsTab({ loading, articles, search }) {
   if (loading && articles.length === 0) {
     return <div className="space-y-4">{[1,2,3,4].map((i) => <div key={i} className="h-28 animate-pulse" style={{ background: "#E5DCC8", animationDelay: `${i*0.1}s` }} />)}</div>;
@@ -417,6 +410,7 @@ function TableTab({ loading, standings, scorers, leagueFilter, error }) {
   return (
     <>
       <SectionTitle label="Classifica" accent="#0A0A0A" />
+      <p className="text-[11px] mb-3" style={{ color: "#666", fontStyle: "italic" }}>💡 Tap sul nome di una squadra per vederne rosa, partite e statistiche</p>
       <div className="overflow-x-auto mb-8">
         <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
           <thead>
@@ -441,14 +435,16 @@ function TableTab({ loading, standings, scorers, leagueFilter, error }) {
               else if (pos <= 6) rowAccent = "#FF8C0022";
               else if (pos === 7) rowAccent = "#00853E22";
               else if (pos >= standings.length - 2) rowAccent = "#E91D5C22";
+              const TeamCell = row.teamId ? Link : "div";
+              const teamProps = row.teamId ? { href: `/team/${row.teamId}` } : {};
               return (
                 <tr key={i} style={{ background: rowAccent, borderBottom: "1px solid #D4C9B0" }}>
                   <td className="py-2 px-2 font-black text-[11px]" style={{ fontFamily: "system-ui, sans-serif" }}>{pos}</td>
                   <td className="py-2 px-2 font-bold" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-                    <div className="flex items-center gap-2">
+                    <TeamCell {...teamProps} className={row.teamId ? "flex items-center gap-2 hover:underline decoration-1 underline-offset-2" : "flex items-center gap-2"}>
                       {row.badge && <img src={row.badge} alt="" className="w-5 h-5 object-contain" loading="lazy" />}
                       <span className="truncate">{row.team}</span>
-                    </div>
+                    </TeamCell>
                   </td>
                   <td className="py-2 px-1 text-center text-[12px]" style={{ fontFamily: "system-ui, sans-serif" }}>{row.played}</td>
                   <td className="py-2 px-1 text-center text-[12px] hidden sm:table-cell" style={{ fontFamily: "system-ui, sans-serif" }}>{row.wins}</td>
@@ -475,25 +471,29 @@ function TableTab({ loading, standings, scorers, leagueFilter, error }) {
         <>
           <SectionTitle label="Capocannonieri" accent="#E91D5C" />
           <div className="space-y-2">
-            {scorers.map((s, i) => (
-              <div key={i} className="flex items-center gap-3 p-3" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
-                <div className="w-9 h-9 flex items-center justify-center font-black text-sm" style={{ background: i === 0 ? "#FFD700" : i === 1 ? "#C0C0C0" : i === 2 ? "#CD7F32" : "#0A0A0A", color: i < 3 ? "#000" : "#fff", fontFamily: "system-ui, sans-serif" }}>
-                  {s.pos}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-base truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{s.player}</div>
-                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
-                    {s.teamBadge && <img src={s.teamBadge} alt="" className="w-3 h-3 object-contain" />}
-                    <span>{s.team}</span>
-                    {s.assists > 0 && <span className="opacity-60">· {s.assists} ass.</span>}
+            {scorers.map((s, i) => {
+              const TeamWrap = s.teamId ? Link : "div";
+              const teamProps = s.teamId ? { href: `/team/${s.teamId}` } : {};
+              return (
+                <div key={i} className="flex items-center gap-3 p-3" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
+                  <div className="w-9 h-9 flex items-center justify-center font-black text-sm" style={{ background: i === 0 ? "#FFD700" : i === 1 ? "#C0C0C0" : i === 2 ? "#CD7F32" : "#0A0A0A", color: i < 3 ? "#000" : "#fff", fontFamily: "system-ui, sans-serif" }}>
+                    {s.pos}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-base truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{s.player}</div>
+                    <TeamWrap {...teamProps} className={s.teamId ? "flex items-center gap-1.5 text-[11px] uppercase tracking-wider hover:underline decoration-1 underline-offset-2" : "flex items-center gap-1.5 text-[11px] uppercase tracking-wider"} style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+                      {s.teamBadge && <img src={s.teamBadge} alt="" className="w-3 h-3 object-contain" />}
+                      <span>{s.team}</span>
+                      {s.assists > 0 && <span className="opacity-60">· {s.assists} ass.</span>}
+                    </TeamWrap>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Target size={14} style={{ color: "#E91D5C" }} />
+                    <span className="font-black text-xl tabular-nums" style={{ fontFamily: "system-ui, sans-serif" }}>{s.goals}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Target size={14} style={{ color: "#E91D5C" }} />
-                  <span className="font-black text-xl tabular-nums" style={{ fontFamily: "system-ui, sans-serif" }}>{s.goals}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
@@ -525,13 +525,12 @@ function FantaTab({ loading, articles }) {
   );
 }
 
-// ============ RADIO TAB — apre sito ufficiale ============
 function RadioTab() {
   return (
     <>
       <SectionTitle label="Radio Live" accent="#E91D5C" />
       <p className="text-sm mb-6" style={{ color: "#3A3A3A", fontFamily: "Georgia, serif" }}>
-        Tocca una radio per aprire la diretta sul sito ufficiale. La radio inizia a suonare nella nuova scheda.
+        Tocca una radio per aprire la diretta sul sito ufficiale.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {RADIOS.map((radio) => (
@@ -549,17 +548,10 @@ function RadioTab() {
           </a>
         ))}
       </div>
-      <div className="mt-6 p-3" style={{ background: "#FEF3C7", border: "1px solid #F59E0B" }}>
-        <p className="text-[12px]" style={{ color: "#78350F", fontFamily: "Georgia, serif" }}>
-          <strong>Perché si apre il sito ufficiale?</strong> Le radio italiane non permettono lo streaming diretto da app di terze parti — il loro player è disponibile solo sui rispettivi siti.
-          Se preferisci ascoltare in app, vai sulla tab <strong>Podcast</strong>: contenuti calcio in audio direttamente qui dentro.
-        </p>
-      </div>
     </>
   );
 }
 
-// ============ PODCAST TAB — Spotify embed ============
 function PodcastTab({ activePodcast, setActivePodcast }) {
   return (
     <>
@@ -567,31 +559,17 @@ function PodcastTab({ activePodcast, setActivePodcast }) {
       <p className="text-sm mb-6" style={{ color: "#3A3A3A", fontFamily: "Georgia, serif" }}>
         I migliori podcast italiani sul calcio. Tocca uno per ascoltarlo direttamente in app.
       </p>
-
-      {/* Player attivo */}
       {activePodcast && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] uppercase tracking-[0.3em] font-black" style={{ fontFamily: "system-ui, sans-serif" }}>
-              ▶ In ascolto
-            </span>
+            <span className="text-[11px] uppercase tracking-[0.3em] font-black" style={{ fontFamily: "system-ui, sans-serif" }}>▶ In ascolto</span>
             <button onClick={() => setActivePodcast(null)} className="text-[10px] uppercase tracking-widest font-bold flex items-center gap-1" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
               <X size={12} /> Chiudi
             </button>
           </div>
-          <iframe
-            src={`https://open.spotify.com/embed/show/${activePodcast.spotifyId}?utm_source=generator&theme=0`}
-            width="100%"
-            height="352"
-            frameBorder="0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
-            style={{ border: "none" }}
-          />
+          <iframe src={`https://open.spotify.com/embed/show/${activePodcast.spotifyId}?utm_source=generator&theme=0`} width="100%" height="352" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" style={{ border: "none" }} />
         </div>
       )}
-
-      {/* Griglia podcast */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {PODCASTS.map((p) => {
           const isActive = activePodcast?.id === p.id;
@@ -619,15 +597,10 @@ function PodcastTab({ activePodcast, setActivePodcast }) {
           );
         })}
       </div>
-
-      <p className="text-[10px] uppercase tracking-widest mt-6 text-center" style={{ color: "#999", fontFamily: "system-ui, sans-serif" }}>
-        ✦ Powered by Spotify ✦ Tocca un podcast per il player completo ✦
-      </p>
     </>
   );
 }
 
-// ============ COMPONENTS ============
 function SectionTitle({ label, accent, count }) {
   return (
     <div className="flex items-center gap-3 my-4">
@@ -723,19 +696,21 @@ function MatchCard({ match, state }) {
         )}
       </div>
       <div className="px-3 py-2.5 space-y-2">
-        <TeamRow team={match.home} badge={match.homeBadge} score={match.homeScore} showScore={showScore} scorers={homeScorers} state={state} />
-        <TeamRow team={match.away} badge={match.awayBadge} score={match.awayScore} showScore={showScore} scorers={awayScorers} state={state} />
+        <TeamRow team={match.home} teamId={match.homeId} badge={match.homeBadge} score={match.homeScore} showScore={showScore} scorers={homeScorers} state={state} />
+        <TeamRow team={match.away} teamId={match.awayId} badge={match.awayBadge} score={match.awayScore} showScore={showScore} scorers={awayScorers} state={state} />
       </div>
     </div>
   );
 }
 
-function TeamRow({ team, badge, score, showScore, scorers, state }) {
+function TeamRow({ team, teamId, badge, score, showScore, scorers, state }) {
+  const TeamWrap = teamId ? Link : "div";
+  const teamProps = teamId ? { href: `/team/${teamId}` } : {};
   return (
     <div>
       <div className="flex items-center gap-2">
         {badge && <img src={badge} alt="" className="w-5 h-5 object-contain" loading="lazy" />}
-        <span className="flex-1 font-bold text-base truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{team}</span>
+        <TeamWrap {...teamProps} className={teamId ? "flex-1 font-bold text-base truncate hover:underline decoration-1 underline-offset-2" : "flex-1 font-bold text-base truncate"} style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{team}</TeamWrap>
         {showScore ? (
           <span className="font-black text-xl tabular-nums" style={{ fontFamily: "system-ui, sans-serif", color: state === "live" ? "#E91D5C" : "#0A0A0A", minWidth: "1.5rem", textAlign: "right" }}>
             {score ?? 0}
