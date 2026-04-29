@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Calendar, User, ExternalLink, Shirt } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, User, ExternalLink, Shirt, Users } from "lucide-react";
 
 function formatMatchDate(iso) {
   if (!iso) return "";
@@ -55,6 +55,7 @@ export default function TeamPage({ params }) {
             <div className="h-32 animate-pulse" style={{ background: "#E5DCC8" }} />
             {[1,2,3,4].map((i) => <div key={i} className="h-16 animate-pulse" style={{ background: "#E5DCC8" }} />)}
           </div>
+          <p className="text-center text-sm mt-6" style={{ color: "#666" }}>Caricamento rosa giocatori in corso…</p>
         </div>
       </div>
     );
@@ -121,8 +122,8 @@ export default function TeamPage({ params }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
           <InfoCell icon={<Calendar size={12} />} label="Fondato" value={info.founded || "—"} />
           <InfoCell icon={<MapPin size={12} />} label="Stadio" value={info.venue || "—"} />
-          <InfoCell icon={<MapPin size={12} />} label="Città" value={info.address ? info.address.split(",")[0] : "—"} />
-          <InfoCell icon={<Shirt size={12} />} label="Rosa" value={`${totalPlayers} giocatori`} />
+          <InfoCell icon={<MapPin size={12} />} label="Città" value={info.venueCity || "—"} />
+          <InfoCell icon={<Users size={12} />} label="Rosa" value={`${totalPlayers} giocatori`} />
         </div>
 
         {info.competitions && info.competitions.length > 0 && (
@@ -173,20 +174,31 @@ export default function TeamPage({ params }) {
           </div>
         )}
 
-        <SectionTitle label={`Rosa · ${totalPlayers} giocatori`} accent="#E91D5C" />
-        {Object.entries(squad).map(([role, players]) => {
-          if (!players || players.length === 0) return null;
-          return (
-            <div key={role} className="mb-5">
-              <h3 className="text-[11px] uppercase tracking-[0.3em] font-black mb-2 px-2 py-1" style={{ background: "#0A0A0A", color: "#F4EFE6", display: "inline-block", fontFamily: "system-ui, sans-serif" }}>
-                {role} · {players.length}
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {players.map((p) => <PlayerRow key={p.id} player={p} />)}
-              </div>
-            </div>
-          );
-        })}
+        {totalPlayers > 0 ? (
+          <>
+            <SectionTitle label={`Rosa · ${totalPlayers} giocatori`} accent="#E91D5C" />
+            {Object.entries(squad).map(([role, players]) => {
+              if (!players || players.length === 0) return null;
+              return (
+                <div key={role} className="mb-5">
+                  <h3 className="text-[11px] uppercase tracking-[0.3em] font-black mb-2 px-2 py-1" style={{ background: "#0A0A0A", color: "#F4EFE6", display: "inline-block", fontFamily: "system-ui, sans-serif" }}>
+                    {role} · {players.length}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {players.map((p) => <PlayerRow key={p.id} player={p} />)}
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        ) : (
+          <>
+            <SectionTitle label="Rosa" accent="#E91D5C" />
+            <p className="text-sm py-3 text-center" style={{ color: "#666", fontStyle: "italic" }}>
+              Rosa non disponibile. Riprova tra qualche minuto.
+            </p>
+          </>
+        )}
 
         {info.website && (
           <div className="mt-8 text-center">
@@ -200,7 +212,7 @@ export default function TeamPage({ params }) {
 
       <footer className="relative z-10 max-w-5xl mx-auto px-4 py-8 mt-8 border-t-2" style={{ borderColor: "#0A0A0A" }}>
         <p className="text-[10px] uppercase tracking-[0.3em] text-center" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
-          ✦ Dati: Football-Data.org ✦
+          ✦ Partite: Football-Data.org · Rose: API-Football ✦
         </p>
       </footer>
     </div>
@@ -286,10 +298,17 @@ function SmallMatchCard({ match, state }) {
 }
 
 function PlayerRow({ player }) {
-  const playerAge = age(player.dateOfBirth);
+  const playerAge = player.age || age(player.dateOfBirth);
   return (
     <div className="flex items-center gap-3 p-2.5" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
-      <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center font-black text-sm" style={{ background: player.shirtNumber ? "#0A0A0A" : "#E5DCC8", color: player.shirtNumber ? "#F4EFE6" : "#666", fontFamily: "system-ui, sans-serif" }}>
+      {player.photo ? (
+        <img src={player.photo} alt="" className="flex-shrink-0 w-10 h-10 object-cover rounded-full" loading="lazy" />
+      ) : (
+        <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#E5DCC8" }}>
+          <User size={16} style={{ color: "#666" }} />
+        </div>
+      )}
+      <div className="flex-shrink-0 w-7 h-7 flex items-center justify-center font-black text-xs" style={{ background: player.shirtNumber ? "#0A0A0A" : "transparent", color: player.shirtNumber ? "#F4EFE6" : "#999", fontFamily: "system-ui, sans-serif" }}>
         {player.shirtNumber || "—"}
       </div>
       <div className="flex-1 min-w-0">
