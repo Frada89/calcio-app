@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Calendar, User, ExternalLink, Shirt, Users } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, User, ExternalLink, Trophy } from "lucide-react";
 
 function formatMatchDate(iso) {
   if (!iso) return "";
@@ -11,13 +11,6 @@ function formatMatchDate(iso) {
     return d.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" }) +
       ` · ${d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`;
   } catch { return iso; }
-}
-
-function age(dob) {
-  if (!dob) return null;
-  const birth = new Date(dob);
-  const diff = Date.now() - birth.getTime();
-  return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
 }
 
 const FORM_COLORS = { V: "#10B981", N: "#F59E0B", P: "#EF4444", "—": "#999" };
@@ -55,7 +48,6 @@ export default function TeamPage({ params }) {
             <div className="h-32 animate-pulse" style={{ background: "#E5DCC8" }} />
             {[1,2,3,4].map((i) => <div key={i} className="h-16 animate-pulse" style={{ background: "#E5DCC8" }} />)}
           </div>
-          <p className="text-center text-sm mt-6" style={{ color: "#666" }}>Caricamento rosa giocatori in corso…</p>
         </div>
       </div>
     );
@@ -77,11 +69,14 @@ export default function TeamPage({ params }) {
   }
 
   const info = data.info || {};
-  const squad = data.squad || {};
   const past = data.past || [];
   const upcoming = data.upcoming || [];
   const form = data.form || [];
-  const totalPlayers = Object.values(squad).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+
+  // Calcola statistiche dalla forma estesa
+  const wins = form.filter(f => f.result === "V").length;
+  const draws = form.filter(f => f.result === "N").length;
+  const losses = form.filter(f => f.result === "P").length;
 
   return (
     <div className="min-h-screen w-full" style={{ background: "#F4EFE6", fontFamily: "Georgia, 'Times New Roman', serif" }}>
@@ -111,6 +106,7 @@ export default function TeamPage({ params }) {
                 <div className="mt-2 flex items-center gap-1.5 text-sm" style={{ color: "#ccc", fontFamily: "system-ui, sans-serif" }}>
                   <User size={12} />
                   <span>{info.coach.name}</span>
+                  {info.coach.nationality && <span className="opacity-60">· {info.coach.nationality}</span>}
                 </div>
               )}
             </div>
@@ -119,11 +115,10 @@ export default function TeamPage({ params }) {
       </div>
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 py-5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+        <div className="grid grid-cols-3 gap-2 mb-6">
           <InfoCell icon={<Calendar size={12} />} label="Fondato" value={info.founded || "—"} />
           <InfoCell icon={<MapPin size={12} />} label="Stadio" value={info.venue || "—"} />
-          <InfoCell icon={<MapPin size={12} />} label="Città" value={info.venueCity || "—"} />
-          <InfoCell icon={<Users size={12} />} label="Rosa" value={`${totalPlayers} giocatori`} />
+          <InfoCell icon={<MapPin size={12} />} label="Città" value={info.address ? info.address.split(/\s+/).slice(-2, -1)[0] || "—" : "—"} />
         </div>
 
         {info.competitions && info.competitions.length > 0 && (
@@ -142,8 +137,8 @@ export default function TeamPage({ params }) {
 
         {form.length > 0 && (
           <div className="mb-6">
-            <SectionTitle label="Forma" accent="#E91D5C" />
-            <div className="flex items-center gap-1.5">
+            <SectionTitle label="Forma Recente" accent="#E91D5C" />
+            <div className="flex items-center gap-1.5 mb-3">
               {form.map((f, i) => (
                 <div key={i} className="w-9 h-9 flex items-center justify-center font-black text-sm" style={{ background: FORM_COLORS[f.result] || "#999", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
                   {f.result}
@@ -152,6 +147,11 @@ export default function TeamPage({ params }) {
               <span className="ml-3 text-[10px] uppercase tracking-widest" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
                 ultime {form.length} partite
               </span>
+            </div>
+            <div className="flex gap-2">
+              <StatBox label="Vittorie" value={wins} color="#10B981" />
+              <StatBox label="Pareggi" value={draws} color="#F59E0B" />
+              <StatBox label="Sconfitte" value={losses} color="#EF4444" />
             </div>
           </div>
         )}
@@ -174,32 +174,6 @@ export default function TeamPage({ params }) {
           </div>
         )}
 
-        {totalPlayers > 0 ? (
-          <>
-            <SectionTitle label={`Rosa · ${totalPlayers} giocatori`} accent="#E91D5C" />
-            {Object.entries(squad).map(([role, players]) => {
-              if (!players || players.length === 0) return null;
-              return (
-                <div key={role} className="mb-5">
-                  <h3 className="text-[11px] uppercase tracking-[0.3em] font-black mb-2 px-2 py-1" style={{ background: "#0A0A0A", color: "#F4EFE6", display: "inline-block", fontFamily: "system-ui, sans-serif" }}>
-                    {role} · {players.length}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {players.map((p) => <PlayerRow key={p.id} player={p} />)}
-                  </div>
-                </div>
-              );
-            })}
-          </>
-        ) : (
-          <>
-            <SectionTitle label="Rosa" accent="#E91D5C" />
-            <p className="text-sm py-3 text-center" style={{ color: "#666", fontStyle: "italic" }}>
-              Rosa non disponibile. Riprova tra qualche minuto.
-            </p>
-          </>
-        )}
-
         {info.website && (
           <div className="mt-8 text-center">
             <a href={info.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 text-[11px] uppercase tracking-widest font-bold" style={{ background: "#0A0A0A", color: "#F4EFE6", fontFamily: "system-ui, sans-serif" }}>
@@ -212,7 +186,7 @@ export default function TeamPage({ params }) {
 
       <footer className="relative z-10 max-w-5xl mx-auto px-4 py-8 mt-8 border-t-2" style={{ borderColor: "#0A0A0A" }}>
         <p className="text-[10px] uppercase tracking-[0.3em] text-center" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
-          ✦ Partite: Football-Data.org · Rose: API-Football ✦
+          ✦ Dati: Football-Data.org ✦
         </p>
       </footer>
     </div>
@@ -260,6 +234,15 @@ function InfoCell({ icon, label, value }) {
   );
 }
 
+function StatBox({ label, value, color }) {
+  return (
+    <div className="flex-1 p-3 text-center" style={{ background: "#FFFFFF", border: `2px solid ${color}` }}>
+      <div className="text-2xl font-black" style={{ color, fontFamily: "system-ui, sans-serif" }}>{value}</div>
+      <div className="text-[10px] uppercase tracking-widest font-bold mt-1" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>{label}</div>
+    </div>
+  );
+}
+
 function SmallMatchCard({ match, state }) {
   const showScore = state === "finished";
   return (
@@ -291,31 +274,6 @@ function SmallMatchCard({ match, state }) {
             {match.awayBadge && <img src={match.awayBadge} alt="" className="w-4 h-4 object-contain flex-shrink-0" />}
             <span className="font-bold text-sm truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{match.away}</span>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PlayerRow({ player }) {
-  const playerAge = player.age || age(player.dateOfBirth);
-  return (
-    <div className="flex items-center gap-3 p-2.5" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
-      {player.photo ? (
-        <img src={player.photo} alt="" className="flex-shrink-0 w-10 h-10 object-cover rounded-full" loading="lazy" />
-      ) : (
-        <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#E5DCC8" }}>
-          <User size={16} style={{ color: "#666" }} />
-        </div>
-      )}
-      <div className="flex-shrink-0 w-7 h-7 flex items-center justify-center font-black text-xs" style={{ background: player.shirtNumber ? "#0A0A0A" : "transparent", color: player.shirtNumber ? "#F4EFE6" : "#999", fontFamily: "system-ui, sans-serif" }}>
-        {player.shirtNumber || "—"}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-bold text-sm truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{player.name}</div>
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
-          {player.nationality && <span>{player.nationality}</span>}
-          {playerAge && <span className="opacity-60">· {playerAge} anni</span>}
         </div>
       </div>
     </div>
