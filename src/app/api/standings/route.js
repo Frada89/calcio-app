@@ -44,6 +44,7 @@ export async function GET(request) {
     const totalTable = data.standings.find((s) => s.type === "TOTAL") || data.standings[0];
     const standings = (totalTable.table || []).map((row, i) => ({
       pos: row.position || i + 1,
+      teamId: row.team?.id,
       team: row.team?.shortName || row.team?.name,
       badge: row.team?.crest,
       played: row.playedGames || 0,
