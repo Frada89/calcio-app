@@ -4,9 +4,9 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import {
   RefreshCw, Clock, ExternalLink, Zap, Wifi, WifiOff,
   Search, X, Trophy, Users, Newspaper, Activity, BarChart3, Target,
-  Calendar, Gamepad2, Radio, Play, Pause, Volume2
+  Calendar, Gamepad2, Radio, Headphones
 } from "lucide-react";
-import { LEAGUES, TEAMS, isLight, FANTA_LINKS, RADIOS } from "@/lib/config";
+import { LEAGUES, TEAMS, isLight, FANTA_LINKS, RADIOS, PODCASTS } from "@/lib/config";
 
 function timeAgo(input) {
   const d = input instanceof Date ? input : new Date(input);
@@ -47,7 +47,6 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // Data states
   const [articles, setArticles] = useState([]);
   const [newsLoading, setNewsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -68,17 +67,12 @@ export default function Home() {
   const [fantaArticles, setFantaArticles] = useState([]);
   const [fantaLoading, setFantaLoading] = useState(false);
 
+  const [activePodcast, setActivePodcast] = useState(null);
+
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [countdown, setCountdown] = useState(120);
   const knownIdsRef = useRef(new Set());
   const REFRESH_INTERVAL = 120;
-
-  // Radio player state (persistent)
-  const [currentRadio, setCurrentRadio] = useState(null);
-  const [radioPlaying, setRadioPlaying] = useState(false);
-  const [radioVolume, setRadioVolume] = useState(0.7);
-  const [radioError, setRadioError] = useState(null);
-  const audioRef = useRef(null);
 
   async function loadNews(isInitial = false) {
     setNewsLoading(true);
@@ -168,52 +162,6 @@ export default function Home() {
     return () => clearInterval(tick);
   }, [autoRefresh, tab]);
 
-  // ===== RADIO LOGIC =====
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = radioVolume;
-    }
-  }, [radioVolume]);
-
-  function playRadio(radio) {
-    setRadioError(null);
-    if (currentRadio?.id === radio.id && radioPlaying) {
-      // pausa
-      audioRef.current?.pause();
-      setRadioPlaying(false);
-      return;
-    }
-    if (currentRadio?.id === radio.id && !radioPlaying) {
-      // riprendi
-      audioRef.current?.play().then(() => setRadioPlaying(true)).catch(() => {
-        setRadioError("Stream non disponibile. Apri sul sito ufficiale.");
-        setRadioPlaying(false);
-      });
-      return;
-    }
-    // Nuova radio
-    setCurrentRadio(radio);
-    setTimeout(() => {
-      if (audioRef.current) {
-        audioRef.current.src = radio.stream;
-        audioRef.current.volume = radioVolume;
-        audioRef.current.play()
-          .then(() => setRadioPlaying(true))
-          .catch(() => {
-            setRadioError("Stream non disponibile. Apri sul sito ufficiale.");
-            setRadioPlaying(false);
-          });
-      }
-    }, 100);
-  }
-
-  function stopRadio() {
-    audioRef.current?.pause();
-    setRadioPlaying(false);
-    setCurrentRadio(null);
-    setRadioError(null);
-  }
-
   function handleManualRefresh() {
     if (tab === "news") loadNews(false);
     else if (tab === "live" || tab === "calendar") loadMatches();
@@ -250,7 +198,7 @@ export default function Home() {
 
   const activeLeague = LEAGUES.find((l) => l.id === leagueFilter);
   const isLoading = newsLoading || matchesLoading || tableLoading || fantaLoading;
-  const showLeagueFilter = tab !== "fanta" && tab !== "radio";
+  const showLeagueFilter = !["fanta", "radio", "podcast"].includes(tab);
 
   const TABS = [
     { id: "news", label: "Notizie", icon: Newspaper },
@@ -259,12 +207,11 @@ export default function Home() {
     { id: "table", label: "Classifica", icon: BarChart3 },
     { id: "fanta", label: "Fanta", icon: Gamepad2 },
     { id: "radio", label: "Radio", icon: Radio },
+    { id: "podcast", label: "Podcast", icon: Headphones },
   ];
 
   return (
-    <div className="min-h-screen w-full pb-20" style={{ background: "#F4EFE6", fontFamily: "Georgia, 'Times New Roman', serif" }}>
-      <audio ref={audioRef} preload="none" />
-
+    <div className="min-h-screen w-full" style={{ background: "#F4EFE6", fontFamily: "Georgia, 'Times New Roman', serif" }}>
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-0"
         style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
 
@@ -313,7 +260,6 @@ export default function Home() {
         )}
       </header>
 
-      {/* TAB BAR */}
       <div className="sticky z-30" style={{ top: searchOpen && tab === "news" ? "138px" : "94px", background: "#0A0A0A" }}>
         <div className="max-w-5xl mx-auto flex overflow-x-auto">
           {TABS.map((t) => {
@@ -330,7 +276,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* LEAGUE FILTER */}
       {showLeagueFilter && (
         <div className="sticky z-20 backdrop-blur-md" style={{ top: searchOpen && tab === "news" ? "180px" : "136px", background: "rgba(244, 239, 230, 0.92)", borderBottom: "1px solid #D4C9B0" }}>
           <div className="max-w-5xl mx-auto px-4 py-2 overflow-x-auto">
@@ -370,46 +315,16 @@ export default function Home() {
         {tab === "calendar" && <CalendarTab loading={matchesLoading} upcoming={upcomingMatches} activeLeague={activeLeague} error={matchesError} />}
         {tab === "table" && <TableTab loading={tableLoading} standings={standings} scorers={scorers} leagueFilter={leagueFilter} error={tableError} />}
         {tab === "fanta" && <FantaTab loading={fantaLoading} articles={fantaArticles} />}
-        {tab === "radio" && <RadioTab currentRadio={currentRadio} radioPlaying={radioPlaying} onPlay={playRadio} radioError={radioError} />}
+        {tab === "radio" && <RadioTab />}
+        {tab === "podcast" && <PodcastTab activePodcast={activePodcast} setActivePodcast={setActivePodcast} />}
       </main>
-
-      {/* RADIO MINI PLAYER (sticky bottom) */}
-      {currentRadio && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 border-t-4" style={{ background: "#0A0A0A", borderColor: currentRadio.color }}>
-          <div className="max-w-5xl mx-auto px-3 py-2.5 flex items-center gap-3">
-            <button onClick={() => playRadio(currentRadio)} className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition active:scale-95" style={{ background: currentRadio.color, color: isLight(currentRadio.color) ? "#000" : "#fff" }}>
-              {radioPlaying ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                {radioPlaying && <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 radio-playing" />}
-                <span className="text-sm font-bold truncate" style={{ color: "#F4EFE6", fontFamily: "system-ui, sans-serif" }}>{currentRadio.name}</span>
-              </div>
-              <span className="text-[10px] uppercase tracking-widest" style={{ color: "#888", fontFamily: "system-ui, sans-serif" }}>
-                {radioError ? radioError : radioPlaying ? "▶ in onda" : "in pausa"}
-              </span>
-            </div>
-            <div className="hidden sm:flex items-center gap-1.5">
-              <Volume2 size={14} style={{ color: "#888" }} />
-              <input type="range" min="0" max="1" step="0.05" value={radioVolume} onChange={(e) => setRadioVolume(parseFloat(e.target.value))} className="w-20" />
-            </div>
-            {radioError && (
-              <a href={currentRadio.site} target="_blank" rel="noopener noreferrer" className="text-[10px] uppercase tracking-widest font-bold px-2 py-1" style={{ background: "#E91D5C", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
-                Apri sito
-              </a>
-            )}
-            <button onClick={stopRadio} className="flex-shrink-0 p-1.5" style={{ color: "#888" }}>
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
 
       <footer className="relative z-10 max-w-5xl mx-auto px-4 py-8 mt-8 border-t-2" style={{ borderColor: "#0A0A0A" }}>
         <p className="text-[10px] uppercase tracking-[0.3em] text-center" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
           ✦ News: Sky · Gazzetta · CDS · Tuttosport · ANSA · CM · TMW ✦<br />
           ✦ Risultati & Tabelle: Football-Data.org ✦<br />
-          ✦ Fanta: SOS Fanta · Fantacalcio.it · FantaMaster · TMW Fanta ✦
+          ✦ Fanta: SOS Fanta · Fantacalcio.it · FantaMaster ✦<br />
+          ✦ Podcast: Spotify ✦
         </p>
       </footer>
     </div>
@@ -441,9 +356,7 @@ function LiveTab({ loading, live, past, activeLeague, error }) {
   if (loading && live.length === 0 && past.length === 0) {
     return <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse" style={{ background: "#E5DCC8" }} />)}</div>;
   }
-  if (error) {
-    return <ServiceError msg={error} />;
-  }
+  if (error) return <ServiceError msg={error} />;
   return (
     <>
       <SectionTitle label="In Corso" accent="#E91D5C" count={live.length} />
@@ -558,7 +471,6 @@ function TableTab({ loading, standings, scorers, leagueFilter, error }) {
         </div>
       </div>
 
-      {/* CAPOCANNONIERI */}
       {scorers.length > 0 && (
         <>
           <SectionTitle label="Capocannonieri" accent="#E91D5C" />
@@ -601,7 +513,6 @@ function FantaTab({ loading, articles }) {
           </a>
         ))}
       </div>
-
       <SectionTitle label="Notizie Fanta" accent="#0072CE" count={articles.length} />
       {loading && articles.length === 0 && (
         <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-20 animate-pulse" style={{ background: "#E5DCC8" }} />)}</div>
@@ -609,54 +520,108 @@ function FantaTab({ loading, articles }) {
       {!loading && articles.length === 0 && (
         <p className="text-center py-8 text-sm" style={{ color: "#666" }}>Nessuna notizia disponibile.</p>
       )}
-      <div>
-        {articles.map((a) => <NewsCard key={a.id} article={a} />)}
+      <div>{articles.map((a) => <NewsCard key={a.id} article={a} />)}</div>
+    </>
+  );
+}
+
+// ============ RADIO TAB — apre sito ufficiale ============
+function RadioTab() {
+  return (
+    <>
+      <SectionTitle label="Radio Live" accent="#E91D5C" />
+      <p className="text-sm mb-6" style={{ color: "#3A3A3A", fontFamily: "Georgia, serif" }}>
+        Tocca una radio per aprire la diretta sul sito ufficiale. La radio inizia a suonare nella nuova scheda.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {RADIOS.map((radio) => (
+          <a key={radio.id} href={radio.site} target="_blank" rel="noopener noreferrer" className="block transition active:scale-[0.98] hover:translate-y-[-2px]" style={{ background: "#FFFFFF", border: `2px solid ${radio.color}` }}>
+            <div className="flex items-center gap-3 p-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center" style={{ background: radio.color, color: isLight(radio.color) ? "#000" : "#fff" }}>
+                <Radio size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-black text-lg leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{radio.name}</div>
+                <div className="text-[11px] uppercase tracking-wider mt-0.5" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>{radio.desc}</div>
+              </div>
+              <ExternalLink size={16} style={{ color: "#999" }} className="flex-shrink-0" />
+            </div>
+          </a>
+        ))}
+      </div>
+      <div className="mt-6 p-3" style={{ background: "#FEF3C7", border: "1px solid #F59E0B" }}>
+        <p className="text-[12px]" style={{ color: "#78350F", fontFamily: "Georgia, serif" }}>
+          <strong>Perché si apre il sito ufficiale?</strong> Le radio italiane non permettono lo streaming diretto da app di terze parti — il loro player è disponibile solo sui rispettivi siti.
+          Se preferisci ascoltare in app, vai sulla tab <strong>Podcast</strong>: contenuti calcio in audio direttamente qui dentro.
+        </p>
       </div>
     </>
   );
 }
 
-function RadioTab({ currentRadio, radioPlaying, onPlay, radioError }) {
+// ============ PODCAST TAB — Spotify embed ============
+function PodcastTab({ activePodcast, setActivePodcast }) {
   return (
     <>
-      <SectionTitle label="Radio Sportive" accent="#E91D5C" />
-      <p className="text-sm mb-6" style={{ color: "#666", fontFamily: "Georgia, serif" }}>
-        Tocca una radio per ascoltarla in streaming. La radio continua mentre navighi nelle altre tab.
+      <SectionTitle label="Podcast Calcio" accent="#1ED760" count={PODCASTS.length} />
+      <p className="text-sm mb-6" style={{ color: "#3A3A3A", fontFamily: "Georgia, serif" }}>
+        I migliori podcast italiani sul calcio. Tocca uno per ascoltarlo direttamente in app.
       </p>
-      <div className="space-y-3">
-        {RADIOS.map((radio) => {
-          const isActive = currentRadio?.id === radio.id;
-          const isPlaying = isActive && radioPlaying;
+
+      {/* Player attivo */}
+      {activePodcast && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] uppercase tracking-[0.3em] font-black" style={{ fontFamily: "system-ui, sans-serif" }}>
+              ▶ In ascolto
+            </span>
+            <button onClick={() => setActivePodcast(null)} className="text-[10px] uppercase tracking-widest font-bold flex items-center gap-1" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+              <X size={12} /> Chiudi
+            </button>
+          </div>
+          <iframe
+            src={`https://open.spotify.com/embed/show/${activePodcast.spotifyId}?utm_source=generator&theme=0`}
+            width="100%"
+            height="352"
+            frameBorder="0"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy"
+            style={{ border: "none" }}
+          />
+        </div>
+      )}
+
+      {/* Griglia podcast */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {PODCASTS.map((p) => {
+          const isActive = activePodcast?.id === p.id;
           return (
-            <div key={radio.id} className="overflow-hidden" style={{ background: "#FFFFFF", border: `2px solid ${isActive ? radio.color : "#D4C9B0"}` }}>
-              <div className="flex items-center gap-3 p-3">
-                <button onClick={() => onPlay(radio)} className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition active:scale-95" style={{ background: radio.color, color: isLight(radio.color) ? "#000" : "#fff" }}>
-                  {isPlaying ? <Pause size={20} /> : <Play size={20} className="ml-0.5" />}
-                </button>
+            <button key={p.id} onClick={() => setActivePodcast(isActive ? null : p)} className="text-left transition active:scale-[0.98] hover:translate-y-[-2px]" style={{ background: "#FFFFFF", border: `2px solid ${isActive ? "#1ED760" : p.color}` }}>
+              <div className="flex items-start gap-3 p-3">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center" style={{ background: p.color, color: isLight(p.color) ? "#000" : "#fff" }}>
+                  <Headphones size={20} />
+                </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{radio.icon}</span>
-                    <span className="font-bold text-lg truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{radio.name}</span>
-                    {isPlaying && <span className="inline-block w-2 h-2 rounded-full bg-red-500 radio-playing" />}
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="font-black text-base leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{p.name}</span>
+                    {p.badge && (
+                      <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5" style={{ background: p.color, color: isLight(p.color) ? "#000" : "#fff", fontFamily: "system-ui, sans-serif" }}>{p.badge}</span>
+                    )}
                   </div>
-                  <div className="text-[11px] uppercase tracking-wider mt-0.5" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>{radio.desc}</div>
+                  <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "#888", fontFamily: "system-ui, sans-serif" }}>{p.author}</div>
+                  <div className="text-[12px] leading-snug" style={{ color: "#3A3A3A", fontFamily: "Georgia, serif" }}>{p.desc}</div>
+                  {isActive && (
+                    <div className="text-[10px] uppercase tracking-widest font-bold mt-1.5" style={{ color: "#1ED760", fontFamily: "system-ui, sans-serif" }}>▶ in ascolto</div>
+                  )}
                 </div>
-                <a href={radio.site} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 p-1.5" style={{ color: "#666" }}>
-                  <ExternalLink size={14} />
-                </a>
               </div>
-              {isActive && radioError && (
-                <div className="px-3 py-2 text-[11px]" style={{ background: "#FEF3C7", color: "#92400E", fontFamily: "system-ui, sans-serif" }}>
-                  {radioError}
-                  <a href={radio.site} target="_blank" rel="noopener noreferrer" className="font-bold ml-2 underline">Apri sul sito</a>
-                </div>
-              )}
-            </div>
+            </button>
           );
         })}
       </div>
+
       <p className="text-[10px] uppercase tracking-widest mt-6 text-center" style={{ color: "#999", fontFamily: "system-ui, sans-serif" }}>
-        ✦ Se uno stream non parte, apri la radio sul sito ufficiale ✦
+        ✦ Powered by Spotify ✦ Tocca un podcast per il player completo ✦
       </p>
     </>
   );
