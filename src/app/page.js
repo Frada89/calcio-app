@@ -5,9 +5,10 @@ import Link from "next/link";
 import {
   RefreshCw, Clock, ExternalLink, Zap, Wifi, WifiOff,
   Search, X, Trophy, Users, Newspaper, Activity, BarChart3, Target,
-  Calendar, Gamepad2, Radio, Headphones
+  Calendar, Gamepad2, Radio, Headphones, Sparkles, Share2, Copy
 } from "lucide-react";
 import { LEAGUES, TEAMS, isLight, FANTA_LINKS, RADIOS, PODCASTS } from "@/lib/config";
+import { predictMatch, getTeamStats, buildShareText } from "@/lib/predictions";
 
 // =================== BANNER ADSTERRA ===================
 function AdBanner({ size }) {
@@ -15,36 +16,21 @@ function AdBanner({ size }) {
   const loaded = useRef(false);
 
   const configs = {
-    header: {
-      key: "d1914ab2decc8ba22cf0f25a2657456f",
-      width: 468,
-      height: 60,
-    },
-    rectangle: {
-      key: "e7fa008dae6b0fa2fbfaeb7adae5a514",
-      width: 300,
-      height: 250,
-    },
+    header: { key: "d1914ab2decc8ba22cf0f25a2657456f", width: 468, height: 60 },
+    rectangle: { key: "e7fa008dae6b0fa2fbfaeb7adae5a514", width: 300, height: 250 },
   };
   const cfg = configs[size] || configs.header;
 
   useEffect(() => {
     if (loaded.current || !ref.current) return;
     loaded.current = true;
-
     const container = ref.current;
     container.innerHTML = "";
 
     const optScript = document.createElement("script");
     optScript.type = "text/javascript";
     optScript.innerHTML = `
-      atOptions = {
-        'key' : '${cfg.key}',
-        'format' : 'iframe',
-        'height' : ${cfg.height},
-        'width' : ${cfg.width},
-        'params' : {}
-      };
+      atOptions = { 'key' : '${cfg.key}', 'format' : 'iframe', 'height' : ${cfg.height}, 'width' : ${cfg.width}, 'params' : {} };
     `;
     container.appendChild(optScript);
 
@@ -57,15 +43,7 @@ function AdBanner({ size }) {
 
   return (
     <div className="my-4 flex justify-center" aria-label="Pubblicità">
-      <div
-        ref={ref}
-        style={{
-          width: `${cfg.width}px`,
-          height: `${cfg.height}px`,
-          maxWidth: "100%",
-          overflow: "hidden",
-        }}
-      />
+      <div ref={ref} style={{ width: `${cfg.width}px`, height: `${cfg.height}px`, maxWidth: "100%", overflow: "hidden" }} />
     </div>
   );
 }
@@ -81,35 +59,26 @@ function VisitCounter() {
 
     async function loadAndIncrement() {
       try {
-        // Verifica se già visitato oggi (sessionStorage)
         const today = new Date().toISOString().split("T")[0];
         const lastVisit = sessionStorage.getItem("ilpallone_visit_date");
-
         let url;
         if (lastVisit === today) {
-          // Solo lettura, niente incremento
           url = "https://countapi.mileshilliard.com/api/v1/get/ilpallone_calcio_app_2026";
         } else {
-          // Incrementa e salva la data
           url = "https://countapi.mileshilliard.com/api/v1/hit/ilpallone_calcio_app_2026";
           sessionStorage.setItem("ilpallone_visit_date", today);
         }
-
         const res = await fetch(url);
         if (!res.ok) return;
         const data = await res.json();
         const value = parseInt(data.value, 10);
         if (!isNaN(value)) setCount(value);
-      } catch (err) {
-        // Silenzioso: se il servizio è offline, il contatore semplicemente non appare
-      }
+      } catch (err) {}
     }
-
     loadAndIncrement();
   }, []);
 
   if (count === null) return null;
-
   return (
     <div className="mb-3 flex items-center justify-center gap-2 text-[11px] uppercase tracking-widest font-bold" style={{ color: "#0A0A0A", fontFamily: "system-ui, sans-serif" }}>
       <Users size={12} style={{ color: "#E91D5C" }} />
@@ -121,6 +90,7 @@ function VisitCounter() {
   );
 }
 
+// =================== UTILS ===================
 function timeAgo(input) {
   const d = input instanceof Date ? input : new Date(input);
   if (!d || isNaN(d.getTime())) return "—";
@@ -153,6 +123,7 @@ function groupByMatchday(matches) {
   return Object.entries(groups);
 }
 
+// =================== HOME ===================
 export default function Home() {
   const [tab, setTab] = useState("news");
   const [leagueFilter, setLeagueFilter] = useState("all");
@@ -178,6 +149,10 @@ export default function Home() {
   const [activePodcast, setActivePodcast] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [countdown, setCountdown] = useState(120);
+
+  // Standings cache per pronostici (per ogni campionato)
+  const [standingsByLeague, setStandingsByLeague] = useState({});
+
   const knownIdsRef = useRef(new Set());
   const REFRESH_INTERVAL = 120;
 
@@ -215,6 +190,17 @@ export default function Home() {
       setLiveMatches(data.live || []);
       setPastMatches(data.past || []);
       setUpcomingMatches(data.upcoming || []);
+
+      // Carica anche standings per i pronostici nel calendario
+      if (target && !standingsByLeague[target]) {
+        try {
+          const sRes = await fetch(`/api/standings?league=${target}`);
+          const sData = await sRes.json();
+          if (sData.standings) {
+            setStandingsByLeague((prev) => ({ ...prev, [target]: sData.standings }));
+          }
+        } catch {}
+      }
     } catch { setMatchesError("Errore caricamento partite"); }
     finally { setMatchesLoading(false); }
   }
@@ -233,6 +219,11 @@ export default function Home() {
       if (s1.error) setTableError(s1.error);
       setStandings(s1.standings || []);
       setScorers(s2.scorers || []);
+
+      // Salva nel cache
+      if (s1.standings) {
+        setStandingsByLeague((prev) => ({ ...prev, [leagueFilter]: s1.standings }));
+      }
     } catch { setTableError("Errore caricamento"); }
     finally { setTableLoading(false); }
   }
@@ -249,7 +240,7 @@ export default function Home() {
   useEffect(() => { loadNews(true); }, []);
 
   useEffect(() => {
-    if (tab === "live" || tab === "calendar") loadMatches();
+    if (tab === "live" || tab === "calendar" || tab === "predict") loadMatches();
     else if (tab === "table") loadTable();
     else if (tab === "fanta") loadFanta();
   }, [tab, leagueFilter]);
@@ -271,7 +262,7 @@ export default function Home() {
 
   function handleManualRefresh() {
     if (tab === "news") loadNews(false);
-    else if (tab === "live" || tab === "calendar") loadMatches();
+    else if (tab === "live" || tab === "calendar" || tab === "predict") loadMatches();
     else if (tab === "table") loadTable();
     else if (tab === "fanta") loadFanta();
     setCountdown(REFRESH_INTERVAL);
@@ -311,11 +302,15 @@ export default function Home() {
     { id: "news", label: "Notizie", icon: Newspaper },
     { id: "live", label: "Risultati", icon: Activity },
     { id: "calendar", label: "Calendario", icon: Calendar },
+    { id: "predict", label: "Pronostici", icon: Sparkles },
     { id: "table", label: "Classifica", icon: BarChart3 },
     { id: "fanta", label: "Fanta", icon: Gamepad2 },
     { id: "radio", label: "Radio", icon: Radio },
     { id: "podcast", label: "Podcast", icon: Headphones },
   ];
+
+  // Standings per il filtro corrente
+  const currentStandings = standingsByLeague[leagueFilter === "all" ? "seriea" : leagueFilter] || [];
 
   return (
     <div className="min-h-screen w-full" style={{ background: "#F4EFE6", fontFamily: "Georgia, 'Times New Roman', serif" }}>
@@ -421,7 +416,8 @@ export default function Home() {
 
         {tab === "news" && <NewsTab loading={newsLoading} articles={filteredNews} search={search} />}
         {tab === "live" && <LiveTab loading={matchesLoading} live={liveMatches} past={pastMatches} activeLeague={activeLeague} error={matchesError} />}
-        {tab === "calendar" && <CalendarTab loading={matchesLoading} upcoming={upcomingMatches} activeLeague={activeLeague} error={matchesError} />}
+        {tab === "calendar" && <CalendarTab loading={matchesLoading} upcoming={upcomingMatches} activeLeague={activeLeague} error={matchesError} standings={currentStandings} />}
+        {tab === "predict" && <PredictTab loading={matchesLoading} upcoming={upcomingMatches} activeLeague={activeLeague} standings={currentStandings} error={matchesError} />}
         {tab === "table" && <TableTab loading={tableLoading} standings={standings} scorers={scorers} leagueFilter={leagueFilter} error={tableError} />}
         {tab === "fanta" && <FantaTab loading={fantaLoading} articles={fantaArticles} />}
         {tab === "radio" && <RadioTab />}
@@ -435,13 +431,14 @@ export default function Home() {
         <p className="text-[10px] uppercase tracking-[0.3em] text-center" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
           ✦ News: Sky · Gazzetta · CDS · Tuttosport · ANSA · CM · TMW ✦<br />
           ✦ Risultati & Tabelle: Football-Data.org ✦<br />
-          ✦ Tap su una squadra per vedere rosa, partite e statistiche ✦
+          ✦ Pronostici per divertimento, non per scommesse ✦
         </p>
       </footer>
     </div>
   );
 }
 
+// =================== TABS ===================
 function NewsTab({ loading, articles, search }) {
   if (loading && articles.length === 0) {
     return <div className="space-y-4">{[1,2,3,4].map((i) => <div key={i} className="h-28 animate-pulse" style={{ background: "#E5DCC8", animationDelay: `${i*0.1}s` }} />)}</div>;
@@ -489,7 +486,7 @@ function LiveTab({ loading, live, past, activeLeague, error }) {
   );
 }
 
-function CalendarTab({ loading, upcoming, activeLeague, error }) {
+function CalendarTab({ loading, upcoming, activeLeague, error, standings }) {
   if (loading && upcoming.length === 0) {
     return <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse" style={{ background: "#E5DCC8" }} />)}</div>;
   }
@@ -508,7 +505,7 @@ function CalendarTab({ loading, upcoming, activeLeague, error }) {
             <div className="h-px flex-1" style={{ background: "#D4C9B0" }} />
           </div>
           <div className="space-y-2">
-            {matches.map((m) => <MatchCard key={m.id} match={m} state="upcoming" />)}
+            {matches.map((m) => <MatchCard key={m.id} match={m} state="upcoming" standings={standings} />)}
           </div>
         </div>
       ))}
@@ -516,6 +513,150 @@ function CalendarTab({ loading, upcoming, activeLeague, error }) {
   );
 }
 
+// =================== TAB PRONOSTICI ===================
+function PredictTab({ loading, upcoming, activeLeague, standings, error }) {
+  const [shareStatus, setShareStatus] = useState("");
+
+  if (loading && upcoming.length === 0) {
+    return <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse" style={{ background: "#E5DCC8" }} />)}</div>;
+  }
+  if (error) return <ServiceError msg={error} />;
+  if (upcoming.length === 0) {
+    return <p className="text-center py-12 text-sm" style={{ color: "#666" }}>Nessuna partita prossima.</p>;
+  }
+
+  // Solo prossima giornata
+  const groups = groupByMatchday(upcoming);
+  const nextMatchday = groups[0];
+  if (!nextMatchday) return null;
+  const [title, matches] = nextMatchday;
+
+  // Genera pronostici
+  const predictions = matches.map((m) => {
+    const homeStats = getTeamStats(m.homeId, m.home, standings);
+    const awayStats = getTeamStats(m.awayId, m.away, standings);
+    const pred = predictMatch(homeStats, awayStats);
+    return { ...m, prediction: pred };
+  });
+
+  // Estrae numero giornata
+  const matchdayNum = title.replace(/\D/g, "") || "?";
+
+  function handleShare() {
+    const shareText = buildShareText(matchdayNum, predictions.map((p) => ({
+      home: p.home,
+      away: p.away,
+      result: p.prediction.result,
+      score: p.prediction.score,
+    })));
+
+    if (navigator.share) {
+      navigator.share({ title: `Pronostici ${title}`, text: shareText }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(shareText).then(() => {
+        setShareStatus("Copiato negli appunti!");
+        setTimeout(() => setShareStatus(""), 3000);
+      });
+    }
+  }
+
+  function handleCopy() {
+    const shareText = buildShareText(matchdayNum, predictions.map((p) => ({
+      home: p.home,
+      away: p.away,
+      result: p.prediction.result,
+      score: p.prediction.score,
+    })));
+    navigator.clipboard.writeText(shareText).then(() => {
+      setShareStatus("Copiato!");
+      setTimeout(() => setShareStatus(""), 3000);
+    });
+  }
+
+  return (
+    <>
+      <SectionTitle label={`Pronostici · ${title}`} accent="#9333EA" count={predictions.length} />
+
+      <div className="mb-4 p-3" style={{ background: "#FEF3C7", border: "1px solid #F59E0B" }}>
+        <p className="text-[12px]" style={{ color: "#78350F", fontFamily: "Georgia, serif" }}>
+          <strong>⚡ Solo per divertimento</strong>: questi pronostici sono generati automaticamente da un algoritmo che considera classifica e forma recente. Non usarli per scommesse.
+        </p>
+      </div>
+
+      {/* Pulsanti azione */}
+      <div className="flex gap-2 mb-5">
+        <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] uppercase tracking-widest font-bold transition active:scale-95" style={{ background: "#25D366", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
+          <Share2 size={12} />
+          <span>Condividi</span>
+        </button>
+        <button onClick={handleCopy} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] uppercase tracking-widest font-bold transition active:scale-95" style={{ background: "#0A0A0A", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
+          <Copy size={12} />
+          <span>Copia</span>
+        </button>
+      </div>
+      {shareStatus && (
+        <p className="text-center text-[11px] uppercase tracking-widest font-bold mb-4" style={{ color: "#10B981", fontFamily: "system-ui, sans-serif" }}>
+          ✓ {shareStatus}
+        </p>
+      )}
+
+      {/* Lista pronostici */}
+      <div className="space-y-3">
+        {predictions.map((m) => <PredictionCard key={m.id} match={m} prediction={m.prediction} />)}
+      </div>
+    </>
+  );
+}
+
+function PredictionCard({ match, prediction }) {
+  const resultColor = prediction.result === "1" ? "#10B981" : prediction.result === "2" ? "#EF4444" : "#F59E0B";
+
+  return (
+    <div className="overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
+      <div className="px-3 py-1.5 flex items-center justify-between" style={{ background: "#F4EFE6" }}>
+        <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+          {formatMatchDate(match.date)}
+        </span>
+        <span className="text-[10px] uppercase tracking-widest font-bold flex items-center gap-1" style={{ color: "#9333EA", fontFamily: "system-ui, sans-serif" }}>
+          <Sparkles size={10} />
+          {prediction.confidence}%
+        </span>
+      </div>
+      <div className="px-3 py-3">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-3">
+          <div className="flex items-center gap-1.5 justify-end">
+            {match.homeBadge && <img src={match.homeBadge} alt="" className="w-5 h-5 object-contain" />}
+            <span className="font-bold text-sm truncate text-right" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{match.home}</span>
+          </div>
+          <span className="text-[10px] uppercase tracking-widest font-bold px-2" style={{ color: "#888", fontFamily: "system-ui, sans-serif" }}>vs</span>
+          <div className="flex items-center gap-1.5">
+            {match.awayBadge && <img src={match.awayBadge} alt="" className="w-5 h-5 object-contain" />}
+            <span className="font-bold text-sm truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{match.away}</span>
+          </div>
+        </div>
+
+        {/* Pronostico in evidenza */}
+        <div className="flex items-center justify-between p-2.5" style={{ background: "#FAFAFA", border: `1px solid ${resultColor}33` }}>
+          <div className="flex items-center gap-2">
+            <div className="px-2.5 py-1 font-black text-base" style={{ background: resultColor, color: "#fff", fontFamily: "system-ui, sans-serif" }}>
+              {prediction.result}
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-widest font-bold" style={{ color: "#0A0A0A", fontFamily: "system-ui, sans-serif" }}>
+                Pronostico {prediction.score}
+              </div>
+              <div className="text-[10px]" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+                {prediction.label}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =================== ALTRE TAB (invariate) ===================
 function TableTab({ loading, standings, scorers, leagueFilter, error }) {
   if (leagueFilter === "all") {
     return <div className="py-12 text-center"><p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.25rem" }}>Seleziona un campionato qui sopra</p></div>;
@@ -718,6 +859,7 @@ function PodcastTab({ activePodcast, setActivePodcast }) {
   );
 }
 
+// =================== COMPONENTS ===================
 function SectionTitle({ label, accent, count }) {
   return (
     <div className="flex items-center gap-3 my-4">
@@ -786,10 +928,19 @@ function NewsCard({ article, isLead }) {
   );
 }
 
-function MatchCard({ match, state }) {
+function MatchCard({ match, state, standings }) {
   const showScore = state === "live" || state === "finished";
   const homeScorers = (match.scorers || []).filter((s) => s.team === "home");
   const awayScorers = (match.scorers || []).filter((s) => s.team === "away");
+
+  // Pronostico se è una partita futura e abbiamo standings
+  let prediction = null;
+  if (state === "upcoming" && standings && standings.length > 0) {
+    const homeStats = getTeamStats(match.homeId, match.home, standings);
+    const awayStats = getTeamStats(match.awayId, match.away, standings);
+    prediction = predictMatch(homeStats, awayStats);
+  }
+
   return (
     <div className="overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
       <div className="flex items-center justify-between px-3 py-1.5" style={{ background: state === "live" ? "#E91D5C" : "#F4EFE6" }}>
@@ -816,6 +967,19 @@ function MatchCard({ match, state }) {
         <TeamRow team={match.home} teamId={match.homeId} badge={match.homeBadge} score={match.homeScore} showScore={showScore} scorers={homeScorers} state={state} />
         <TeamRow team={match.away} teamId={match.awayId} badge={match.awayBadge} score={match.awayScore} showScore={showScore} scorers={awayScorers} state={state} />
       </div>
+
+      {/* Pronostico inline */}
+      {prediction && (
+        <div className="px-3 py-1.5 flex items-center gap-2" style={{ background: "#FAFAFA", borderTop: "1px solid #E5DCC8" }}>
+          <Sparkles size={11} style={{ color: "#9333EA" }} />
+          <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: "#9333EA", fontFamily: "system-ui, sans-serif" }}>
+            {prediction.result} · {prediction.score}
+          </span>
+          <span className="text-[10px]" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+            {prediction.label}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
