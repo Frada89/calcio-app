@@ -9,6 +9,68 @@ import {
 } from "lucide-react";
 import { LEAGUES, TEAMS, isLight, FANTA_LINKS, RADIOS, PODCASTS } from "@/lib/config";
 
+// =================== BANNER ADSTERRA ===================
+function AdBanner({ size }) {
+  const ref = useRef(null);
+  const loaded = useRef(false);
+
+  // Configurazioni banner
+  const configs = {
+    header: {
+      key: "d1914ab2decc8ba22cf0f25a2657456f",
+      width: 468,
+      height: 60,
+    },
+    rectangle: {
+      key: "e7fa008dae6b0fa2fbfaeb7adae5a514",
+      width: 300,
+      height: 250,
+    },
+  };
+  const cfg = configs[size] || configs.header;
+
+  useEffect(() => {
+    if (loaded.current || !ref.current) return;
+    loaded.current = true;
+
+    const container = ref.current;
+    container.innerHTML = "";
+
+    const optScript = document.createElement("script");
+    optScript.type = "text/javascript";
+    optScript.innerHTML = `
+      atOptions = {
+        'key' : '${cfg.key}',
+        'format' : 'iframe',
+        'height' : ${cfg.height},
+        'width' : ${cfg.width},
+        'params' : {}
+      };
+    `;
+    container.appendChild(optScript);
+
+    const invokeScript = document.createElement("script");
+    invokeScript.type = "text/javascript";
+    invokeScript.src = `https://www.highperformanceformat.com/${cfg.key}/invoke.js`;
+    invokeScript.async = true;
+    container.appendChild(invokeScript);
+  }, [cfg.key, cfg.width, cfg.height]);
+
+  return (
+    <div className="my-4 flex justify-center" aria-label="Pubblicità">
+      <div
+        ref={ref}
+        style={{
+          width: `${cfg.width}px`,
+          height: `${cfg.height}px`,
+          maxWidth: "100%",
+          overflow: "hidden",
+        }}
+      />
+    </div>
+  );
+}
+
 function timeAgo(input) {
   const d = input instanceof Date ? input : new Date(input);
   if (!d || isNaN(d.getTime())) return "—";
@@ -305,6 +367,9 @@ export default function Home() {
       )}
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 py-5">
+        {/* BANNER HEADER (468x60) */}
+        <AdBanner size="header" />
+
         {tab === "news" && <NewsTab loading={newsLoading} articles={filteredNews} search={search} />}
         {tab === "live" && <LiveTab loading={matchesLoading} live={liveMatches} past={pastMatches} activeLeague={activeLeague} error={matchesError} />}
         {tab === "calendar" && <CalendarTab loading={matchesLoading} upcoming={upcomingMatches} activeLeague={activeLeague} error={matchesError} />}
@@ -312,6 +377,9 @@ export default function Home() {
         {tab === "fanta" && <FantaTab loading={fantaLoading} articles={fantaArticles} />}
         {tab === "radio" && <RadioTab />}
         {tab === "podcast" && <PodcastTab activePodcast={activePodcast} setActivePodcast={setActivePodcast} />}
+
+        {/* BANNER RECTANGLE (300x250) — sotto il contenuto */}
+        <AdBanner size="rectangle" />
       </main>
 
       <footer className="relative z-10 max-w-5xl mx-auto px-4 py-8 mt-8 border-t-2" style={{ borderColor: "#0A0A0A" }}>
@@ -410,7 +478,7 @@ function TableTab({ loading, standings, scorers, leagueFilter, error }) {
   return (
     <>
       <SectionTitle label="Classifica" accent="#0A0A0A" />
-      <p className="text-[11px] mb-3" style={{ color: "#666", fontStyle: "italic" }}>💡 Tap sul nome di una squadra per vederne rosa, partite e statistiche</p>
+      <p className="text-[11px] mb-3" style={{ color: "#666", fontStyle: "italic" }}>💡 Tap sul nome di una squadra per vederne dettagli</p>
       <div className="overflow-x-auto mb-8">
         <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
           <thead>
