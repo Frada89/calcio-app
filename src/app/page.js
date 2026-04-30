@@ -14,7 +14,6 @@ function AdBanner({ size }) {
   const ref = useRef(null);
   const loaded = useRef(false);
 
-  // Configurazioni banner
   const configs = {
     header: {
       key: "d1914ab2decc8ba22cf0f25a2657456f",
@@ -67,6 +66,57 @@ function AdBanner({ size }) {
           overflow: "hidden",
         }}
       />
+    </div>
+  );
+}
+
+// =================== CONTATORE VISITE ===================
+function VisitCounter() {
+  const [count, setCount] = useState(null);
+  const incrementedRef = useRef(false);
+
+  useEffect(() => {
+    if (incrementedRef.current) return;
+    incrementedRef.current = true;
+
+    async function loadAndIncrement() {
+      try {
+        // Verifica se già visitato oggi (sessionStorage)
+        const today = new Date().toISOString().split("T")[0];
+        const lastVisit = sessionStorage.getItem("ilpallone_visit_date");
+
+        let url;
+        if (lastVisit === today) {
+          // Solo lettura, niente incremento
+          url = "https://countapi.mileshilliard.com/api/v1/get/ilpallone_calcio_app_2026";
+        } else {
+          // Incrementa e salva la data
+          url = "https://countapi.mileshilliard.com/api/v1/hit/ilpallone_calcio_app_2026";
+          sessionStorage.setItem("ilpallone_visit_date", today);
+        }
+
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        const value = parseInt(data.value, 10);
+        if (!isNaN(value)) setCount(value);
+      } catch (err) {
+        // Silenzioso: se il servizio è offline, il contatore semplicemente non appare
+      }
+    }
+
+    loadAndIncrement();
+  }, []);
+
+  if (count === null) return null;
+
+  return (
+    <div className="mb-3 flex items-center justify-center gap-2 text-[11px] uppercase tracking-widest font-bold" style={{ color: "#0A0A0A", fontFamily: "system-ui, sans-serif" }}>
+      <Users size={12} style={{ color: "#E91D5C" }} />
+      <span>
+        <span style={{ color: "#E91D5C", fontWeight: 900 }}>{count.toLocaleString("it-IT")}</span>
+        {" "}tifos{count === 1 ? "o è passato" : "i sono passati"} da qui
+      </span>
     </div>
   );
 }
@@ -367,7 +417,6 @@ export default function Home() {
       )}
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 py-5">
-        {/* BANNER HEADER (468x60) */}
         <AdBanner size="header" />
 
         {tab === "news" && <NewsTab loading={newsLoading} articles={filteredNews} search={search} />}
@@ -378,11 +427,11 @@ export default function Home() {
         {tab === "radio" && <RadioTab />}
         {tab === "podcast" && <PodcastTab activePodcast={activePodcast} setActivePodcast={setActivePodcast} />}
 
-        {/* BANNER RECTANGLE (300x250) — sotto il contenuto */}
         <AdBanner size="rectangle" />
       </main>
 
       <footer className="relative z-10 max-w-5xl mx-auto px-4 py-8 mt-8 border-t-2" style={{ borderColor: "#0A0A0A" }}>
+        <VisitCounter />
         <p className="text-[10px] uppercase tracking-[0.3em] text-center" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
           ✦ News: Sky · Gazzetta · CDS · Tuttosport · ANSA · CM · TMW ✦<br />
           ✦ Risultati & Tabelle: Football-Data.org ✦<br />
