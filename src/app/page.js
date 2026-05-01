@@ -5,16 +5,57 @@ import Link from "next/link";
 import {
   RefreshCw, Clock, ExternalLink, Zap, Wifi, WifiOff,
   Search, X, Trophy, Users, Newspaper, Activity, BarChart3, Target,
-  Calendar, Gamepad2, Radio, Headphones, Sparkles, Share2, Copy
+  Calendar, Gamepad2, Radio, Headphones, Sparkles, Share2, Copy, Sun, Moon
 } from "lucide-react";
 import { LEAGUES, TEAMS, isLight, FANTA_LINKS, RADIOS, PODCASTS } from "@/lib/config";
 import { predictMatch, getTeamStats, buildShareText } from "@/lib/predictions";
+
+// ============ TEMA ============
+const THEMES = {
+  light: {
+    bg: "#F4EFE6",
+    bgAlt: "#FFFFFF",
+    bgHeader: "#0A0A0A",
+    bgSticky: "rgba(244, 239, 230, 0.92)",
+    text: "#0A0A0A",
+    textSoft: "#3A3A3A",
+    textMute: "#666",
+    textHeader: "#F4EFE6",
+    border: "#D4C9B0",
+    borderSoft: "#E5DCC8",
+    cardBg: "#FFFFFF",
+    cardHeader: "#F4EFE6",
+    matchHeaderBg: "#FAFAFA",
+    badge: "#0A0A0A",
+    badgeText: "#F4EFE6",
+  },
+  dark: {
+    bg: "#0F0F0F",
+    bgAlt: "#1A1A1A",
+    bgHeader: "#000000",
+    bgSticky: "rgba(15, 15, 15, 0.92)",
+    text: "#F4EFE6",
+    textSoft: "#D4C9B0",
+    textMute: "#9A9A9A",
+    textHeader: "#F4EFE6",
+    border: "#2A2A2A",
+    borderSoft: "#1F1F1F",
+    cardBg: "#1A1A1A",
+    cardHeader: "#0F0F0F",
+    matchHeaderBg: "#222222",
+    badge: "#F4EFE6",
+    badgeText: "#0A0A0A",
+  },
+};
+
+function getTheme(mode) {
+  return THEMES[mode] || THEMES.light;
+}
 
 // =================== BANNER ADSTERRA ===================
 function AdBanner({ size }) {
   const ref = useRef(null);
   const loaded = useRef(false);
-
   const configs = {
     header: { key: "d1914ab2decc8ba22cf0f25a2657456f", width: 468, height: 60 },
     rectangle: { key: "e7fa008dae6b0fa2fbfaeb7adae5a514", width: 300, height: 250 },
@@ -26,14 +67,12 @@ function AdBanner({ size }) {
     loaded.current = true;
     const container = ref.current;
     container.innerHTML = "";
-
     const optScript = document.createElement("script");
     optScript.type = "text/javascript";
     optScript.innerHTML = `
       atOptions = { 'key' : '${cfg.key}', 'format' : 'iframe', 'height' : ${cfg.height}, 'width' : ${cfg.width}, 'params' : {} };
     `;
     container.appendChild(optScript);
-
     const invokeScript = document.createElement("script");
     invokeScript.type = "text/javascript";
     invokeScript.src = `https://www.highperformanceformat.com/${cfg.key}/invoke.js`;
@@ -49,14 +88,13 @@ function AdBanner({ size }) {
 }
 
 // =================== CONTATORE VISITE ===================
-function VisitCounter() {
+function VisitCounter({ theme }) {
   const [count, setCount] = useState(null);
   const incrementedRef = useRef(false);
 
   useEffect(() => {
     if (incrementedRef.current) return;
     incrementedRef.current = true;
-
     async function loadAndIncrement() {
       try {
         const today = new Date().toISOString().split("T")[0];
@@ -80,7 +118,7 @@ function VisitCounter() {
 
   if (count === null) return null;
   return (
-    <div className="mb-3 flex items-center justify-center gap-2 text-[11px] uppercase tracking-widest font-bold" style={{ color: "#0A0A0A", fontFamily: "system-ui, sans-serif" }}>
+    <div className="mb-3 flex items-center justify-center gap-2 text-[11px] uppercase tracking-widest font-bold" style={{ color: theme.text, fontFamily: "system-ui, sans-serif" }}>
       <Users size={12} style={{ color: "#E91D5C" }} />
       <span>
         <span style={{ color: "#E91D5C", fontWeight: 900 }}>{count.toLocaleString("it-IT")}</span>
@@ -90,7 +128,6 @@ function VisitCounter() {
   );
 }
 
-// =================== UTILS ===================
 function timeAgo(input) {
   const d = input instanceof Date ? input : new Date(input);
   if (!d || isNaN(d.getTime())) return "—";
@@ -123,8 +160,14 @@ function groupByMatchday(matches) {
   return Object.entries(groups);
 }
 
+function getVisibleLeagues(tab) {
+  if (tab === "news") return LEAGUES;
+  return LEAGUES.filter((l) => l.id !== "all");
+}
+
 // =================== HOME ===================
 export default function Home() {
+  const [themeMode, setThemeMode] = useState("light");
   const [tab, setTab] = useState("news");
   const [leagueFilter, setLeagueFilter] = useState("all");
   const [teamFilter, setTeamFilter] = useState(null);
@@ -149,12 +192,41 @@ export default function Home() {
   const [activePodcast, setActivePodcast] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [countdown, setCountdown] = useState(120);
-
-  // Standings cache per pronostici (per ogni campionato)
   const [standingsByLeague, setStandingsByLeague] = useState({});
-
   const knownIdsRef = useRef(new Set());
   const REFRESH_INTERVAL = 120;
+
+  const theme = getTheme(themeMode);
+
+  // Carica preferenza tema dal localStorage al primo render
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ilpallone_theme");
+      if (saved === "dark" || saved === "light") setThemeMode(saved);
+    } catch {}
+  }, []);
+
+  // Salva preferenza tema quando cambia
+  useEffect(() => {
+    try { localStorage.setItem("ilpallone_theme", themeMode); } catch {}
+    // Aggiorna anche colore di sfondo del documento
+    if (typeof document !== "undefined") {
+      document.documentElement.style.background = theme.bg;
+      document.body.style.background = theme.bg;
+    }
+  }, [themeMode, theme.bg]);
+
+  function toggleTheme() {
+    setThemeMode((m) => (m === "light" ? "dark" : "light"));
+  }
+
+  useEffect(() => {
+    const dataTabs = ["live", "calendar", "predict", "table"];
+    if (dataTabs.includes(tab) && leagueFilter === "all") {
+      setLeagueFilter("seriea");
+      setTeamFilter(null);
+    }
+  }, [tab]);
 
   async function loadNews(isInitial = false) {
     setNewsLoading(true);
@@ -190,8 +262,6 @@ export default function Home() {
       setLiveMatches(data.live || []);
       setPastMatches(data.past || []);
       setUpcomingMatches(data.upcoming || []);
-
-      // Carica anche standings per i pronostici nel calendario
       if (target && !standingsByLeague[target]) {
         try {
           const sRes = await fetch(`/api/standings?league=${target}`);
@@ -219,8 +289,6 @@ export default function Home() {
       if (s1.error) setTableError(s1.error);
       setStandings(s1.standings || []);
       setScorers(s2.scorers || []);
-
-      // Salva nel cache
       if (s1.standings) {
         setStandingsByLeague((prev) => ({ ...prev, [leagueFilter]: s1.standings }));
       }
@@ -294,9 +362,10 @@ export default function Home() {
     return f;
   }, [articles, leagueFilter, teamFilter, search]);
 
-  const activeLeague = LEAGUES.find((l) => l.id === leagueFilter);
+  const activeLeague = LEAGUES.find((l) => l.id === leagueFilter) || LEAGUES[0];
   const isLoading = newsLoading || matchesLoading || tableLoading || fantaLoading;
   const showLeagueFilter = !["fanta", "radio", "podcast"].includes(tab);
+  const visibleLeagues = getVisibleLeagues(tab);
 
   const TABS = [
     { id: "news", label: "Notizie", icon: Newspaper },
@@ -309,15 +378,14 @@ export default function Home() {
     { id: "podcast", label: "Podcast", icon: Headphones },
   ];
 
-  // Standings per il filtro corrente
   const currentStandings = standingsByLeague[leagueFilter === "all" ? "seriea" : leagueFilter] || [];
 
   return (
-    <div className="min-h-screen w-full" style={{ background: "#F4EFE6", fontFamily: "Georgia, 'Times New Roman', serif" }}>
+    <div className="min-h-screen w-full" style={{ background: theme.bg, fontFamily: "Georgia, 'Times New Roman', serif" }}>
       <div className="fixed inset-0 pointer-events-none opacity-[0.04] z-0"
         style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
 
-      <header className="sticky top-0 z-40 border-b-4" style={{ background: "#0A0A0A", borderColor: activeLeague.color === "#0A0A0A" ? "#E91D5C" : activeLeague.color }}>
+      <header className="sticky top-0 z-40 border-b-4" style={{ background: theme.bgHeader, borderColor: activeLeague.color === "#0A0A0A" ? "#E91D5C" : activeLeague.color }}>
         <div className="max-w-5xl mx-auto px-4 py-3">
           <div className="flex items-baseline justify-between gap-3">
             <div className="flex items-baseline gap-2 min-w-0">
@@ -328,6 +396,9 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-1.5">
               {online ? <Wifi size={14} style={{ color: "#4ADE80" }} /> : <WifiOff size={14} style={{ color: "#FB923C" }} />}
+              <button onClick={toggleTheme} className="p-1.5 transition active:scale-95" style={{ background: "#222", color: "#fff" }} aria-label="Cambia tema">
+                {themeMode === "light" ? <Moon size={14} /> : <Sun size={14} />}
+              </button>
               {tab === "news" && (
                 <button onClick={() => setSearchOpen((v) => !v)} className="p-1.5 transition active:scale-95" style={{ background: searchOpen ? "#E91D5C" : "#222", color: "#fff" }}>
                   {searchOpen ? <X size={14} /> : <Search size={14} />}
@@ -362,7 +433,7 @@ export default function Home() {
         )}
       </header>
 
-      <div className="sticky z-30" style={{ top: searchOpen && tab === "news" ? "138px" : "94px", background: "#0A0A0A" }}>
+      <div className="sticky z-30" style={{ top: searchOpen && tab === "news" ? "138px" : "94px", background: theme.bgHeader }}>
         <div className="max-w-5xl mx-auto flex overflow-x-auto">
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -379,12 +450,12 @@ export default function Home() {
       </div>
 
       {showLeagueFilter && (
-        <div className="sticky z-20 backdrop-blur-md" style={{ top: searchOpen && tab === "news" ? "180px" : "136px", background: "rgba(244, 239, 230, 0.92)", borderBottom: "1px solid #D4C9B0" }}>
+        <div className="sticky z-20 backdrop-blur-md" style={{ top: searchOpen && tab === "news" ? "180px" : "136px", background: theme.bgSticky, borderBottom: `1px solid ${theme.border}` }}>
           <div className="max-w-5xl mx-auto px-4 py-2 overflow-x-auto">
             <div className="flex items-center gap-1.5 min-w-max">
-              <Trophy size={11} style={{ color: "#666" }} className="mr-1" />
-              {LEAGUES.map((l) => (
-                <button key={l.id} onClick={() => { setLeagueFilter(l.id); setTeamFilter(null); }} className="px-2.5 py-1 text-[10px] uppercase tracking-widest font-bold transition active:scale-95 flex items-center gap-1" style={{ background: leagueFilter === l.id ? l.color : "transparent", color: leagueFilter === l.id ? (isLight(l.color) ? "#000" : "#fff") : "#0A0A0A", border: `1.5px solid ${leagueFilter === l.id ? l.color : "#0A0A0A"}`, fontFamily: "system-ui, sans-serif" }}>
+              <Trophy size={11} style={{ color: theme.textMute }} className="mr-1" />
+              {visibleLeagues.map((l) => (
+                <button key={l.id} onClick={() => { setLeagueFilter(l.id); setTeamFilter(null); }} className="px-2.5 py-1 text-[10px] uppercase tracking-widest font-bold transition active:scale-95 flex items-center gap-1" style={{ background: leagueFilter === l.id ? l.color : "transparent", color: leagueFilter === l.id ? (isLight(l.color) ? "#000" : "#fff") : theme.text, border: `1.5px solid ${leagueFilter === l.id ? l.color : theme.text}`, fontFamily: "system-ui, sans-serif" }}>
                   <span>{l.icon}</span>
                   <span>{l.name}</span>
                   {tab === "news" && leagueCounts[l.id] > 0 && <span className="opacity-70 text-[9px]">{leagueCounts[l.id]}</span>}
@@ -393,14 +464,14 @@ export default function Home() {
             </div>
           </div>
           {tab === "news" && teamsForLeague.length > 0 && (
-            <div className="max-w-5xl mx-auto px-4 py-2 overflow-x-auto" style={{ borderTop: "1px solid #E5DCC8" }}>
+            <div className="max-w-5xl mx-auto px-4 py-2 overflow-x-auto" style={{ borderTop: `1px solid ${theme.borderSoft}` }}>
               <div className="flex items-center gap-1.5 min-w-max">
-                <Users size={11} style={{ color: "#666" }} className="mr-1" />
-                <button onClick={() => setTeamFilter(null)} className="px-2.5 py-0.5 text-[10px] uppercase tracking-wider font-bold transition active:scale-95" style={{ background: !teamFilter ? "#0A0A0A" : "transparent", color: !teamFilter ? "#F4EFE6" : "#666", border: `1px solid ${!teamFilter ? "#0A0A0A" : "#999"}`, fontFamily: "system-ui, sans-serif" }}>
+                <Users size={11} style={{ color: theme.textMute }} className="mr-1" />
+                <button onClick={() => setTeamFilter(null)} className="px-2.5 py-0.5 text-[10px] uppercase tracking-wider font-bold transition active:scale-95" style={{ background: !teamFilter ? theme.badge : "transparent", color: !teamFilter ? theme.badgeText : theme.textMute, border: `1px solid ${!teamFilter ? theme.badge : "#999"}`, fontFamily: "system-ui, sans-serif" }}>
                   Tutte
                 </button>
                 {teamsForLeague.map((t) => (
-                  <button key={t.id} onClick={() => setTeamFilter(t.id === teamFilter ? null : t.id)} className="px-2.5 py-0.5 text-[10px] uppercase tracking-wider font-bold transition active:scale-95 flex items-center gap-1" style={{ background: teamFilter === t.id ? t.color : "transparent", color: teamFilter === t.id ? (isLight(t.color) ? "#000" : "#fff") : "#0A0A0A", border: `1px solid ${teamFilter === t.id ? t.color : "#999"}`, fontFamily: "system-ui, sans-serif" }}>
+                  <button key={t.id} onClick={() => setTeamFilter(t.id === teamFilter ? null : t.id)} className="px-2.5 py-0.5 text-[10px] uppercase tracking-wider font-bold transition active:scale-95 flex items-center gap-1" style={{ background: teamFilter === t.id ? t.color : "transparent", color: teamFilter === t.id ? (isLight(t.color) ? "#000" : "#fff") : theme.text, border: `1px solid ${teamFilter === t.id ? t.color : "#999"}`, fontFamily: "system-ui, sans-serif" }}>
                     <span>{t.name}</span>
                     <span className="opacity-60 text-[9px]">{t.count}</span>
                   </button>
@@ -414,21 +485,21 @@ export default function Home() {
       <main className="relative z-10 max-w-5xl mx-auto px-4 py-5">
         <AdBanner size="header" />
 
-        {tab === "news" && <NewsTab loading={newsLoading} articles={filteredNews} search={search} />}
-        {tab === "live" && <LiveTab loading={matchesLoading} live={liveMatches} past={pastMatches} activeLeague={activeLeague} error={matchesError} />}
-        {tab === "calendar" && <CalendarTab loading={matchesLoading} upcoming={upcomingMatches} activeLeague={activeLeague} error={matchesError} standings={currentStandings} />}
-        {tab === "predict" && <PredictTab loading={matchesLoading} upcoming={upcomingMatches} activeLeague={activeLeague} standings={currentStandings} error={matchesError} />}
-        {tab === "table" && <TableTab loading={tableLoading} standings={standings} scorers={scorers} leagueFilter={leagueFilter} error={tableError} />}
-        {tab === "fanta" && <FantaTab loading={fantaLoading} articles={fantaArticles} />}
-        {tab === "radio" && <RadioTab />}
-        {tab === "podcast" && <PodcastTab activePodcast={activePodcast} setActivePodcast={setActivePodcast} />}
+        {tab === "news" && <NewsTab loading={newsLoading} articles={filteredNews} search={search} theme={theme} />}
+        {tab === "live" && <LiveTab loading={matchesLoading} live={liveMatches} past={pastMatches} activeLeague={activeLeague} error={matchesError} theme={theme} />}
+        {tab === "calendar" && <CalendarTab loading={matchesLoading} upcoming={upcomingMatches} activeLeague={activeLeague} error={matchesError} standings={currentStandings} theme={theme} />}
+        {tab === "predict" && <PredictTab loading={matchesLoading} upcoming={upcomingMatches} activeLeague={activeLeague} standings={currentStandings} error={matchesError} theme={theme} />}
+        {tab === "table" && <TableTab loading={tableLoading} standings={standings} scorers={scorers} leagueFilter={leagueFilter} error={tableError} theme={theme} />}
+        {tab === "fanta" && <FantaTab loading={fantaLoading} articles={fantaArticles} theme={theme} />}
+        {tab === "radio" && <RadioTab theme={theme} />}
+        {tab === "podcast" && <PodcastTab activePodcast={activePodcast} setActivePodcast={setActivePodcast} theme={theme} />}
 
         <AdBanner size="rectangle" />
       </main>
 
-      <footer className="relative z-10 max-w-5xl mx-auto px-4 py-8 mt-8 border-t-2" style={{ borderColor: "#0A0A0A" }}>
-        <VisitCounter />
-        <p className="text-[10px] uppercase tracking-[0.3em] text-center" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+      <footer className="relative z-10 max-w-5xl mx-auto px-4 py-8 mt-8 border-t-2" style={{ borderColor: theme.text }}>
+        <VisitCounter theme={theme} />
+        <p className="text-[10px] uppercase tracking-[0.3em] text-center" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>
           ✦ News: Sky · Gazzetta · CDS · Tuttosport · ANSA · CM · TMW ✦<br />
           ✦ Risultati & Tabelle: Football-Data.org ✦<br />
           ✦ Pronostici per divertimento, non per scommesse ✦
@@ -439,73 +510,73 @@ export default function Home() {
 }
 
 // =================== TABS ===================
-function NewsTab({ loading, articles, search }) {
+function NewsTab({ loading, articles, search, theme }) {
   if (loading && articles.length === 0) {
-    return <div className="space-y-4">{[1,2,3,4].map((i) => <div key={i} className="h-28 animate-pulse" style={{ background: "#E5DCC8", animationDelay: `${i*0.1}s` }} />)}</div>;
+    return <div className="space-y-4">{[1,2,3,4].map((i) => <div key={i} className="h-28 animate-pulse" style={{ background: theme.border, animationDelay: `${i*0.1}s` }} />)}</div>;
   }
   if (articles.length === 0) {
-    return <div className="py-20 text-center"><p className="text-2xl" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Nessuna notizia</p><p className="text-sm mt-2" style={{ color: "#666" }}>{search ? `per "${search}"` : "Prova a cambiare filtri"}</p></div>;
+    return <div className="py-20 text-center"><p className="text-2xl" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>Nessuna notizia</p><p className="text-sm mt-2" style={{ color: theme.textMute }}>{search ? `per "${search}"` : "Prova a cambiare filtri"}</p></div>;
   }
   return (
     <>
-      {articles[0] && <NewsCard article={articles[0]} isLead />}
+      {articles[0] && <NewsCard article={articles[0]} isLead theme={theme} />}
       <div className="flex items-center gap-3 my-5">
-        <div className="h-px flex-1" style={{ background: "#0A0A0A" }} />
-        <span className="text-[10px] uppercase tracking-[0.3em] font-bold" style={{ fontFamily: "system-ui, sans-serif" }}>Cronaca</span>
-        <div className="h-px flex-1" style={{ background: "#0A0A0A" }} />
+        <div className="h-px flex-1" style={{ background: theme.text }} />
+        <span className="text-[10px] uppercase tracking-[0.3em] font-bold" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>Cronaca</span>
+        <div className="h-px flex-1" style={{ background: theme.text }} />
       </div>
-      <div>{articles.slice(1).map((a) => <NewsCard key={a.id} article={a} />)}</div>
+      <div>{articles.slice(1).map((a) => <NewsCard key={a.id} article={a} theme={theme} />)}</div>
     </>
   );
 }
 
-function LiveTab({ loading, live, past, activeLeague, error }) {
+function LiveTab({ loading, live, past, activeLeague, error, theme }) {
   if (loading && live.length === 0 && past.length === 0) {
-    return <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse" style={{ background: "#E5DCC8" }} />)}</div>;
+    return <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse" style={{ background: theme.border }} />)}</div>;
   }
-  if (error) return <ServiceError msg={error} />;
+  if (error) return <ServiceError msg={error} theme={theme} />;
   return (
     <>
-      <SectionTitle label="In Corso" accent="#E91D5C" count={live.length} />
+      <SectionTitle label="In Corso" accent="#E91D5C" count={live.length} theme={theme} />
       {live.length === 0 ? (
-        <p className="text-sm py-3" style={{ color: "#666", fontStyle: "italic" }}>Nessuna partita in corso al momento.</p>
+        <p className="text-sm py-3" style={{ color: theme.textMute, fontStyle: "italic" }}>Nessuna partita in corso al momento.</p>
       ) : (
         <div className="space-y-3 mb-7">
-          {live.map((m) => <MatchCard key={m.id} match={m} state="live" />)}
+          {live.map((m) => <MatchCard key={m.id} match={m} state="live" theme={theme} />)}
         </div>
       )}
-      <SectionTitle label={`Risultati · ${activeLeague.name === "Tutti" ? "Serie A" : activeLeague.name}`} accent="#0A0A0A" count={past.length} />
+      <SectionTitle label={`Risultati · ${activeLeague.name}`} accent={theme.text} count={past.length} theme={theme} />
       {past.length === 0 ? (
-        <p className="text-sm py-3" style={{ color: "#666", fontStyle: "italic" }}>Nessun risultato disponibile.</p>
+        <p className="text-sm py-3" style={{ color: theme.textMute, fontStyle: "italic" }}>Nessun risultato disponibile.</p>
       ) : (
         <div className="space-y-3">
-          {past.map((m) => <MatchCard key={m.id} match={m} state="finished" />)}
+          {past.map((m) => <MatchCard key={m.id} match={m} state="finished" theme={theme} />)}
         </div>
       )}
     </>
   );
 }
 
-function CalendarTab({ loading, upcoming, activeLeague, error, standings }) {
+function CalendarTab({ loading, upcoming, activeLeague, error, standings, theme }) {
   if (loading && upcoming.length === 0) {
-    return <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse" style={{ background: "#E5DCC8" }} />)}</div>;
+    return <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse" style={{ background: theme.border }} />)}</div>;
   }
-  if (error) return <ServiceError msg={error} />;
+  if (error) return <ServiceError msg={error} theme={theme} />;
   if (upcoming.length === 0) {
-    return <p className="text-center py-12 text-sm" style={{ color: "#666" }}>Nessuna partita programmata.</p>;
+    return <p className="text-center py-12 text-sm" style={{ color: theme.textMute }}>Nessuna partita programmata.</p>;
   }
   const groups = groupByMatchday(upcoming);
   return (
     <>
-      <SectionTitle label={`Calendario · ${activeLeague.name === "Tutti" ? "Serie A" : activeLeague.name}`} accent="#0072CE" count={upcoming.length} />
+      <SectionTitle label={`Calendario · ${activeLeague.name}`} accent="#0072CE" count={upcoming.length} theme={theme} />
       {groups.map(([title, matches]) => (
         <div key={title} className="mb-6">
           <div className="flex items-center gap-3 mb-3">
-            <span className="text-[11px] uppercase tracking-[0.3em] font-black px-3 py-1" style={{ background: "#0A0A0A", color: "#F4EFE6", fontFamily: "system-ui, sans-serif" }}>{title}</span>
-            <div className="h-px flex-1" style={{ background: "#D4C9B0" }} />
+            <span className="text-[11px] uppercase tracking-[0.3em] font-black px-3 py-1" style={{ background: theme.badge, color: theme.badgeText, fontFamily: "system-ui, sans-serif" }}>{title}</span>
+            <div className="h-px flex-1" style={{ background: theme.border }} />
           </div>
           <div className="space-y-2">
-            {matches.map((m) => <MatchCard key={m.id} match={m} state="upcoming" standings={standings} />)}
+            {matches.map((m) => <MatchCard key={m.id} match={m} state="upcoming" standings={standings} theme={theme} />)}
           </div>
         </div>
       ))}
@@ -513,25 +584,22 @@ function CalendarTab({ loading, upcoming, activeLeague, error, standings }) {
   );
 }
 
-// =================== TAB PRONOSTICI ===================
-function PredictTab({ loading, upcoming, activeLeague, standings, error }) {
+function PredictTab({ loading, upcoming, activeLeague, standings, error, theme }) {
   const [shareStatus, setShareStatus] = useState("");
 
   if (loading && upcoming.length === 0) {
-    return <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse" style={{ background: "#E5DCC8" }} />)}</div>;
+    return <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 animate-pulse" style={{ background: theme.border }} />)}</div>;
   }
-  if (error) return <ServiceError msg={error} />;
+  if (error) return <ServiceError msg={error} theme={theme} />;
   if (upcoming.length === 0) {
-    return <p className="text-center py-12 text-sm" style={{ color: "#666" }}>Nessuna partita prossima.</p>;
+    return <p className="text-center py-12 text-sm" style={{ color: theme.textMute }}>Nessuna partita prossima.</p>;
   }
 
-  // Solo prossima giornata
   const groups = groupByMatchday(upcoming);
   const nextMatchday = groups[0];
   if (!nextMatchday) return null;
   const [title, matches] = nextMatchday;
 
-  // Genera pronostici
   const predictions = matches.map((m) => {
     const homeStats = getTeamStats(m.homeId, m.home, standings);
     const awayStats = getTeamStats(m.awayId, m.away, standings);
@@ -539,17 +607,12 @@ function PredictTab({ loading, upcoming, activeLeague, standings, error }) {
     return { ...m, prediction: pred };
   });
 
-  // Estrae numero giornata
   const matchdayNum = title.replace(/\D/g, "") || "?";
 
   function handleShare() {
     const shareText = buildShareText(matchdayNum, predictions.map((p) => ({
-      home: p.home,
-      away: p.away,
-      result: p.prediction.result,
-      score: p.prediction.score,
+      home: p.home, away: p.away, result: p.prediction.result, score: p.prediction.score,
     })));
-
     if (navigator.share) {
       navigator.share({ title: `Pronostici ${title}`, text: shareText }).catch(() => {});
     } else {
@@ -562,10 +625,7 @@ function PredictTab({ loading, upcoming, activeLeague, standings, error }) {
 
   function handleCopy() {
     const shareText = buildShareText(matchdayNum, predictions.map((p) => ({
-      home: p.home,
-      away: p.away,
-      result: p.prediction.result,
-      score: p.prediction.score,
+      home: p.home, away: p.away, result: p.prediction.result, score: p.prediction.score,
     })));
     navigator.clipboard.writeText(shareText).then(() => {
       setShareStatus("Copiato!");
@@ -575,21 +635,20 @@ function PredictTab({ loading, upcoming, activeLeague, standings, error }) {
 
   return (
     <>
-      <SectionTitle label={`Pronostici · ${title}`} accent="#9333EA" count={predictions.length} />
+      <SectionTitle label={`Pronostici · ${title} · ${activeLeague.name}`} accent="#9333EA" count={predictions.length} theme={theme} />
 
       <div className="mb-4 p-3" style={{ background: "#FEF3C7", border: "1px solid #F59E0B" }}>
         <p className="text-[12px]" style={{ color: "#78350F", fontFamily: "Georgia, serif" }}>
-          <strong>⚡ Solo per divertimento</strong>: questi pronostici sono generati automaticamente da un algoritmo che considera classifica e forma recente. Non usarli per scommesse.
+          <strong>⚡ Solo per divertimento</strong>: questi pronostici sono generati automaticamente. Non usarli per scommesse.
         </p>
       </div>
 
-      {/* Pulsanti azione */}
       <div className="flex gap-2 mb-5">
         <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] uppercase tracking-widest font-bold transition active:scale-95" style={{ background: "#25D366", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
           <Share2 size={12} />
           <span>Condividi</span>
         </button>
-        <button onClick={handleCopy} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] uppercase tracking-widest font-bold transition active:scale-95" style={{ background: "#0A0A0A", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
+        <button onClick={handleCopy} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] uppercase tracking-widest font-bold transition active:scale-95" style={{ background: theme.badge, color: theme.badgeText, fontFamily: "system-ui, sans-serif" }}>
           <Copy size={12} />
           <span>Copia</span>
         </button>
@@ -600,21 +659,19 @@ function PredictTab({ loading, upcoming, activeLeague, standings, error }) {
         </p>
       )}
 
-      {/* Lista pronostici */}
       <div className="space-y-3">
-        {predictions.map((m) => <PredictionCard key={m.id} match={m} prediction={m.prediction} />)}
+        {predictions.map((m) => <PredictionCard key={m.id} match={m} prediction={m.prediction} theme={theme} />)}
       </div>
     </>
   );
 }
 
-function PredictionCard({ match, prediction }) {
+function PredictionCard({ match, prediction, theme }) {
   const resultColor = prediction.result === "1" ? "#10B981" : prediction.result === "2" ? "#EF4444" : "#F59E0B";
-
   return (
-    <div className="overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
-      <div className="px-3 py-1.5 flex items-center justify-between" style={{ background: "#F4EFE6" }}>
-        <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+    <div className="overflow-hidden" style={{ background: theme.cardBg, border: `1px solid ${theme.border}` }}>
+      <div className="px-3 py-1.5 flex items-center justify-between" style={{ background: theme.cardHeader }}>
+        <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>
           {formatMatchDate(match.date)}
         </span>
         <span className="text-[10px] uppercase tracking-widest font-bold flex items-center gap-1" style={{ color: "#9333EA", fontFamily: "system-ui, sans-serif" }}>
@@ -626,26 +683,24 @@ function PredictionCard({ match, prediction }) {
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-3">
           <div className="flex items-center gap-1.5 justify-end">
             {match.homeBadge && <img src={match.homeBadge} alt="" className="w-5 h-5 object-contain" />}
-            <span className="font-bold text-sm truncate text-right" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{match.home}</span>
+            <span className="font-bold text-sm truncate text-right" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>{match.home}</span>
           </div>
-          <span className="text-[10px] uppercase tracking-widest font-bold px-2" style={{ color: "#888", fontFamily: "system-ui, sans-serif" }}>vs</span>
+          <span className="text-[10px] uppercase tracking-widest font-bold px-2" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>vs</span>
           <div className="flex items-center gap-1.5">
             {match.awayBadge && <img src={match.awayBadge} alt="" className="w-5 h-5 object-contain" />}
-            <span className="font-bold text-sm truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{match.away}</span>
+            <span className="font-bold text-sm truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>{match.away}</span>
           </div>
         </div>
-
-        {/* Pronostico in evidenza */}
-        <div className="flex items-center justify-between p-2.5" style={{ background: "#FAFAFA", border: `1px solid ${resultColor}33` }}>
+        <div className="flex items-center justify-between p-2.5" style={{ background: theme.matchHeaderBg, border: `1px solid ${resultColor}33` }}>
           <div className="flex items-center gap-2">
             <div className="px-2.5 py-1 font-black text-base" style={{ background: resultColor, color: "#fff", fontFamily: "system-ui, sans-serif" }}>
               {prediction.result}
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-widest font-bold" style={{ color: "#0A0A0A", fontFamily: "system-ui, sans-serif" }}>
+              <div className="text-[11px] uppercase tracking-widest font-bold" style={{ color: theme.text, fontFamily: "system-ui, sans-serif" }}>
                 Pronostico {prediction.score}
               </div>
-              <div className="text-[10px]" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+              <div className="text-[10px]" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>
                 {prediction.label}
               </div>
             </div>
@@ -656,23 +711,19 @@ function PredictionCard({ match, prediction }) {
   );
 }
 
-// =================== ALTRE TAB (invariate) ===================
-function TableTab({ loading, standings, scorers, leagueFilter, error }) {
-  if (leagueFilter === "all") {
-    return <div className="py-12 text-center"><p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.25rem" }}>Seleziona un campionato qui sopra</p></div>;
-  }
-  if (loading) return <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="h-10 animate-pulse" style={{ background: "#E5DCC8" }} />)}</div>;
-  if (error) return <ServiceError msg={error} />;
-  if (standings.length === 0) return <p className="text-center py-12 text-sm" style={{ color: "#666" }}>Classifica non disponibile.</p>;
+function TableTab({ loading, standings, scorers, leagueFilter, error, theme }) {
+  if (loading) return <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="h-10 animate-pulse" style={{ background: theme.border }} />)}</div>;
+  if (error) return <ServiceError msg={error} theme={theme} />;
+  if (standings.length === 0) return <p className="text-center py-12 text-sm" style={{ color: theme.textMute }}>Classifica non disponibile.</p>;
 
   return (
     <>
-      <SectionTitle label="Classifica" accent="#0A0A0A" />
-      <p className="text-[11px] mb-3" style={{ color: "#666", fontStyle: "italic" }}>💡 Tap sul nome di una squadra per vederne dettagli</p>
+      <SectionTitle label="Classifica" accent={theme.text} theme={theme} />
+      <p className="text-[11px] mb-3" style={{ color: theme.textMute, fontStyle: "italic" }}>💡 Tap sul nome di una squadra per vederne dettagli</p>
       <div className="overflow-x-auto mb-8">
         <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
           <thead>
-            <tr className="text-[10px] uppercase tracking-widest" style={{ background: "#0A0A0A", color: "#F4EFE6", fontFamily: "system-ui, sans-serif" }}>
+            <tr className="text-[10px] uppercase tracking-widest" style={{ background: theme.badge, color: theme.badgeText, fontFamily: "system-ui, sans-serif" }}>
               <th className="py-2 px-2 text-left">#</th>
               <th className="py-2 px-2 text-left">Squadra</th>
               <th className="py-2 px-1 text-center">G</th>
@@ -696,50 +747,44 @@ function TableTab({ loading, standings, scorers, leagueFilter, error }) {
               const TeamCell = row.teamId ? Link : "div";
               const teamProps = row.teamId ? { href: `/team/${row.teamId}` } : {};
               return (
-                <tr key={i} style={{ background: rowAccent, borderBottom: "1px solid #D4C9B0" }}>
-                  <td className="py-2 px-2 font-black text-[11px]" style={{ fontFamily: "system-ui, sans-serif" }}>{pos}</td>
-                  <td className="py-2 px-2 font-bold" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                <tr key={i} style={{ background: rowAccent, borderBottom: `1px solid ${theme.border}` }}>
+                  <td className="py-2 px-2 font-black text-[11px]" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>{pos}</td>
+                  <td className="py-2 px-2 font-bold" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>
                     <TeamCell {...teamProps} className={row.teamId ? "flex items-center gap-2 hover:underline decoration-1 underline-offset-2" : "flex items-center gap-2"}>
                       {row.badge && <img src={row.badge} alt="" className="w-5 h-5 object-contain" loading="lazy" />}
                       <span className="truncate">{row.team}</span>
                     </TeamCell>
                   </td>
-                  <td className="py-2 px-1 text-center text-[12px]" style={{ fontFamily: "system-ui, sans-serif" }}>{row.played}</td>
-                  <td className="py-2 px-1 text-center text-[12px] hidden sm:table-cell" style={{ fontFamily: "system-ui, sans-serif" }}>{row.wins}</td>
-                  <td className="py-2 px-1 text-center text-[12px] hidden sm:table-cell" style={{ fontFamily: "system-ui, sans-serif" }}>{row.draws}</td>
-                  <td className="py-2 px-1 text-center text-[12px] hidden sm:table-cell" style={{ fontFamily: "system-ui, sans-serif" }}>{row.losses}</td>
-                  <td className="py-2 px-1 text-center text-[12px] hidden md:table-cell" style={{ fontFamily: "system-ui, sans-serif" }}>{row.gf}</td>
-                  <td className="py-2 px-1 text-center text-[12px] hidden md:table-cell" style={{ fontFamily: "system-ui, sans-serif" }}>{row.ga}</td>
-                  <td className="py-2 px-1 text-center text-[12px]" style={{ fontFamily: "system-ui, sans-serif" }}>{row.gd > 0 ? "+" : ""}{row.gd}</td>
-                  <td className="py-2 px-2 text-center font-black text-base" style={{ fontFamily: "system-ui, sans-serif" }}>{row.points}</td>
+                  <td className="py-2 px-1 text-center text-[12px]" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>{row.played}</td>
+                  <td className="py-2 px-1 text-center text-[12px] hidden sm:table-cell" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>{row.wins}</td>
+                  <td className="py-2 px-1 text-center text-[12px] hidden sm:table-cell" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>{row.draws}</td>
+                  <td className="py-2 px-1 text-center text-[12px] hidden sm:table-cell" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>{row.losses}</td>
+                  <td className="py-2 px-1 text-center text-[12px] hidden md:table-cell" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>{row.gf}</td>
+                  <td className="py-2 px-1 text-center text-[12px] hidden md:table-cell" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>{row.ga}</td>
+                  <td className="py-2 px-1 text-center text-[12px]" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>{row.gd > 0 ? "+" : ""}{row.gd}</td>
+                  <td className="py-2 px-2 text-center font-black text-base" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>{row.points}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-        <div className="mt-3 flex flex-wrap gap-3 text-[10px] uppercase tracking-widest" style={{ fontFamily: "system-ui, sans-serif", color: "#666" }}>
-          <Legend color="#0072CE" label="Champions" />
-          <Legend color="#FF8C00" label="Europa" />
-          <Legend color="#00853E" label="Conference" />
-          <Legend color="#E91D5C" label="Retrocessione" />
-        </div>
       </div>
 
       {scorers.length > 0 && (
         <>
-          <SectionTitle label="Capocannonieri" accent="#E91D5C" />
+          <SectionTitle label="Capocannonieri" accent="#E91D5C" theme={theme} />
           <div className="space-y-2">
             {scorers.map((s, i) => {
               const TeamWrap = s.teamId ? Link : "div";
               const teamProps = s.teamId ? { href: `/team/${s.teamId}` } : {};
               return (
-                <div key={i} className="flex items-center gap-3 p-3" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
-                  <div className="w-9 h-9 flex items-center justify-center font-black text-sm" style={{ background: i === 0 ? "#FFD700" : i === 1 ? "#C0C0C0" : i === 2 ? "#CD7F32" : "#0A0A0A", color: i < 3 ? "#000" : "#fff", fontFamily: "system-ui, sans-serif" }}>
+                <div key={i} className="flex items-center gap-3 p-3" style={{ background: theme.cardBg, border: `1px solid ${theme.border}` }}>
+                  <div className="w-9 h-9 flex items-center justify-center font-black text-sm" style={{ background: i === 0 ? "#FFD700" : i === 1 ? "#C0C0C0" : i === 2 ? "#CD7F32" : theme.badge, color: i < 3 ? "#000" : theme.badgeText, fontFamily: "system-ui, sans-serif" }}>
                     {s.pos}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-base truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{s.player}</div>
-                    <TeamWrap {...teamProps} className={s.teamId ? "flex items-center gap-1.5 text-[11px] uppercase tracking-wider hover:underline decoration-1 underline-offset-2" : "flex items-center gap-1.5 text-[11px] uppercase tracking-wider"} style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+                    <div className="font-bold text-base truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>{s.player}</div>
+                    <TeamWrap {...teamProps} className={s.teamId ? "flex items-center gap-1.5 text-[11px] uppercase tracking-wider hover:underline decoration-1 underline-offset-2" : "flex items-center gap-1.5 text-[11px] uppercase tracking-wider"} style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>
                       {s.teamBadge && <img src={s.teamBadge} alt="" className="w-3 h-3 object-contain" />}
                       <span>{s.team}</span>
                       {s.assists > 0 && <span className="opacity-60">· {s.assists} ass.</span>}
@@ -747,7 +792,7 @@ function TableTab({ loading, standings, scorers, leagueFilter, error }) {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Target size={14} style={{ color: "#E91D5C" }} />
-                    <span className="font-black text-xl tabular-nums" style={{ fontFamily: "system-ui, sans-serif" }}>{s.goals}</span>
+                    <span className="font-black text-xl tabular-nums" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>{s.goals}</span>
                   </div>
                 </div>
               );
@@ -759,49 +804,49 @@ function TableTab({ loading, standings, scorers, leagueFilter, error }) {
   );
 }
 
-function FantaTab({ loading, articles }) {
+function FantaTab({ loading, articles, theme }) {
   return (
     <>
-      <SectionTitle label="Strumenti Fanta" accent="#E91D5C" />
+      <SectionTitle label="Strumenti Fanta" accent="#E91D5C" theme={theme} />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-7">
         {FANTA_LINKS.map((link) => (
-          <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="block p-3 transition hover:translate-y-[-2px]" style={{ background: "#FFFFFF", border: `2px solid ${link.color}` }}>
+          <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="block p-3 transition hover:translate-y-[-2px]" style={{ background: theme.cardBg, border: `2px solid ${link.color}` }}>
             <div className="text-[11px] font-black uppercase tracking-widest mb-0.5" style={{ color: link.color, fontFamily: "system-ui, sans-serif" }}>{link.name}</div>
-            <div className="text-[11px]" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>{link.desc}</div>
+            <div className="text-[11px]" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>{link.desc}</div>
           </a>
         ))}
       </div>
-      <SectionTitle label="Notizie Fanta" accent="#0072CE" count={articles.length} />
+      <SectionTitle label="Notizie Fanta" accent="#0072CE" count={articles.length} theme={theme} />
       {loading && articles.length === 0 && (
-        <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-20 animate-pulse" style={{ background: "#E5DCC8" }} />)}</div>
+        <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-20 animate-pulse" style={{ background: theme.border }} />)}</div>
       )}
       {!loading && articles.length === 0 && (
-        <p className="text-center py-8 text-sm" style={{ color: "#666" }}>Nessuna notizia disponibile.</p>
+        <p className="text-center py-8 text-sm" style={{ color: theme.textMute }}>Nessuna notizia disponibile.</p>
       )}
-      <div>{articles.map((a) => <NewsCard key={a.id} article={a} />)}</div>
+      <div>{articles.map((a) => <NewsCard key={a.id} article={a} theme={theme} />)}</div>
     </>
   );
 }
 
-function RadioTab() {
+function RadioTab({ theme }) {
   return (
     <>
-      <SectionTitle label="Radio Live" accent="#E91D5C" />
-      <p className="text-sm mb-6" style={{ color: "#3A3A3A", fontFamily: "Georgia, serif" }}>
+      <SectionTitle label="Radio Live" accent="#E91D5C" theme={theme} />
+      <p className="text-sm mb-6" style={{ color: theme.textSoft, fontFamily: "Georgia, serif" }}>
         Tocca una radio per aprire la diretta sul sito ufficiale.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {RADIOS.map((radio) => (
-          <a key={radio.id} href={radio.site} target="_blank" rel="noopener noreferrer" className="block transition active:scale-[0.98] hover:translate-y-[-2px]" style={{ background: "#FFFFFF", border: `2px solid ${radio.color}` }}>
+          <a key={radio.id} href={radio.site} target="_blank" rel="noopener noreferrer" className="block transition active:scale-[0.98] hover:translate-y-[-2px]" style={{ background: theme.cardBg, border: `2px solid ${radio.color}` }}>
             <div className="flex items-center gap-3 p-4">
               <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center" style={{ background: radio.color, color: isLight(radio.color) ? "#000" : "#fff" }}>
                 <Radio size={20} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-black text-lg leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{radio.name}</div>
-                <div className="text-[11px] uppercase tracking-wider mt-0.5" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>{radio.desc}</div>
+                <div className="font-black text-lg leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>{radio.name}</div>
+                <div className="text-[11px] uppercase tracking-wider mt-0.5" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>{radio.desc}</div>
               </div>
-              <ExternalLink size={16} style={{ color: "#999" }} className="flex-shrink-0" />
+              <ExternalLink size={16} style={{ color: theme.textMute }} className="flex-shrink-0" />
             </div>
           </a>
         ))}
@@ -810,18 +855,18 @@ function RadioTab() {
   );
 }
 
-function PodcastTab({ activePodcast, setActivePodcast }) {
+function PodcastTab({ activePodcast, setActivePodcast, theme }) {
   return (
     <>
-      <SectionTitle label="Podcast Calcio" accent="#1ED760" count={PODCASTS.length} />
-      <p className="text-sm mb-6" style={{ color: "#3A3A3A", fontFamily: "Georgia, serif" }}>
+      <SectionTitle label="Podcast Calcio" accent="#1ED760" count={PODCASTS.length} theme={theme} />
+      <p className="text-sm mb-6" style={{ color: theme.textSoft, fontFamily: "Georgia, serif" }}>
         I migliori podcast italiani sul calcio. Tocca uno per ascoltarlo direttamente in app.
       </p>
       {activePodcast && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] uppercase tracking-[0.3em] font-black" style={{ fontFamily: "system-ui, sans-serif" }}>▶ In ascolto</span>
-            <button onClick={() => setActivePodcast(null)} className="text-[10px] uppercase tracking-widest font-bold flex items-center gap-1" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+            <span className="text-[11px] uppercase tracking-[0.3em] font-black" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>▶ In ascolto</span>
+            <button onClick={() => setActivePodcast(null)} className="text-[10px] uppercase tracking-widest font-bold flex items-center gap-1" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>
               <X size={12} /> Chiudi
             </button>
           </div>
@@ -832,20 +877,20 @@ function PodcastTab({ activePodcast, setActivePodcast }) {
         {PODCASTS.map((p) => {
           const isActive = activePodcast?.id === p.id;
           return (
-            <button key={p.id} onClick={() => setActivePodcast(isActive ? null : p)} className="text-left transition active:scale-[0.98] hover:translate-y-[-2px]" style={{ background: "#FFFFFF", border: `2px solid ${isActive ? "#1ED760" : p.color}` }}>
+            <button key={p.id} onClick={() => setActivePodcast(isActive ? null : p)} className="text-left transition active:scale-[0.98] hover:translate-y-[-2px]" style={{ background: theme.cardBg, border: `2px solid ${isActive ? "#1ED760" : p.color}` }}>
               <div className="flex items-start gap-3 p-3">
                 <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center" style={{ background: p.color, color: isLight(p.color) ? "#000" : "#fff" }}>
                   <Headphones size={20} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="font-black text-base leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{p.name}</span>
+                    <span className="font-black text-base leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>{p.name}</span>
                     {p.badge && (
                       <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5" style={{ background: p.color, color: isLight(p.color) ? "#000" : "#fff", fontFamily: "system-ui, sans-serif" }}>{p.badge}</span>
                     )}
                   </div>
-                  <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "#888", fontFamily: "system-ui, sans-serif" }}>{p.author}</div>
-                  <div className="text-[12px] leading-snug" style={{ color: "#3A3A3A", fontFamily: "Georgia, serif" }}>{p.desc}</div>
+                  <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>{p.author}</div>
+                  <div className="text-[12px] leading-snug" style={{ color: theme.textSoft, fontFamily: "Georgia, serif" }}>{p.desc}</div>
                   {isActive && (
                     <div className="text-[10px] uppercase tracking-widest font-bold mt-1.5" style={{ color: "#1ED760", fontFamily: "system-ui, sans-serif" }}>▶ in ascolto</div>
                   )}
@@ -859,34 +904,28 @@ function PodcastTab({ activePodcast, setActivePodcast }) {
   );
 }
 
-// =================== COMPONENTS ===================
-function SectionTitle({ label, accent, count }) {
+function SectionTitle({ label, accent, count, theme }) {
   return (
     <div className="flex items-center gap-3 my-4">
       <div className="h-[3px] w-8" style={{ background: accent }} />
-      <span className="text-[11px] uppercase tracking-[0.3em] font-black" style={{ fontFamily: "system-ui, sans-serif", color: "#0A0A0A" }}>
+      <span className="text-[11px] uppercase tracking-[0.3em] font-black" style={{ fontFamily: "system-ui, sans-serif", color: theme.text }}>
         {label}{count !== undefined && count > 0 && <span className="ml-2 opacity-50">{count}</span>}
       </span>
-      <div className="h-px flex-1" style={{ background: "#D4C9B0" }} />
+      <div className="h-px flex-1" style={{ background: theme.border }} />
     </div>
   );
 }
 
-function Legend({ color, label }) {
-  return <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3" style={{ background: color + "22", border: `1px solid ${color}` }} />{label}</span>;
-}
-
-function ServiceError({ msg }) {
+function ServiceError({ msg, theme }) {
   return (
     <div className="py-10 text-center">
-      <p className="text-base mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Servizio non disponibile</p>
-      <p className="text-sm" style={{ color: "#666" }}>{msg}</p>
-      <p className="text-[11px] mt-3" style={{ color: "#999" }}>Verifica che FOOTBALL_DATA_API_KEY sia impostata su Vercel.</p>
+      <p className="text-base mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>Servizio non disponibile</p>
+      <p className="text-sm" style={{ color: theme.textMute }}>{msg}</p>
     </div>
   );
 }
 
-function NewsCard({ article, isLead }) {
+function NewsCard({ article, isLead, theme }) {
   if (isLead) {
     return (
       <a href={article.link} target="_blank" rel="noopener noreferrer" className="block mb-7 group">
@@ -899,9 +938,9 @@ function NewsCard({ article, isLead }) {
             })}
             <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: "#E91D5C", fontFamily: "system-ui, sans-serif" }}>◆ Apertura</span>
           </div>
-          <h2 className="text-2xl sm:text-3xl leading-[1.1] font-black mb-2 group-hover:underline decoration-2 underline-offset-4" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#0A0A0A" }}>{article.title}</h2>
-          {article.description && <p className="text-sm leading-relaxed mb-3" style={{ color: "#3A3A3A" }}>{article.description}…</p>}
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+          <h2 className="text-2xl sm:text-3xl leading-[1.1] font-black mb-2 group-hover:underline decoration-2 underline-offset-4" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>{article.title}</h2>
+          {article.description && <p className="text-sm leading-relaxed mb-3" style={{ color: theme.textSoft }}>{article.description}…</p>}
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>
             <Clock size={10} />
             <span>{timeAgo(article.pubDate)} fa</span>
             <ExternalLink size={10} className="ml-auto" />
@@ -911,7 +950,7 @@ function NewsCard({ article, isLead }) {
     );
   }
   return (
-    <a href={article.link} target="_blank" rel="noopener noreferrer" className="block group border-b py-3.5 transition hover:pl-2" style={{ borderColor: "#D4C9B0" }}>
+    <a href={article.link} target="_blank" rel="noopener noreferrer" className="block group border-b py-3.5 transition hover:pl-2" style={{ borderColor: theme.border }}>
       <article>
         <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
           <span className="text-[9px] font-black uppercase tracking-[0.2em] px-1.5 py-0.5" style={{ background: article.source.color, color: "#fff", fontFamily: "system-ui, sans-serif" }}>{article.source.accent}</span>
@@ -919,21 +958,20 @@ function NewsCard({ article, isLead }) {
             const t = TEAMS[tid];
             return <span key={tid} className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5" style={{ background: t.color, color: isLight(t.color) ? "#000" : "#fff", fontFamily: "system-ui, sans-serif" }}>{t.name}</span>;
           })}
-          <span className="text-[10px] uppercase tracking-widest ml-auto" style={{ color: "#888", fontFamily: "system-ui, sans-serif" }}>{timeAgo(article.pubDate)}</span>
+          <span className="text-[10px] uppercase tracking-widest ml-auto" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>{timeAgo(article.pubDate)}</span>
         </div>
-        <h3 className="text-base sm:text-lg leading-[1.2] font-bold group-hover:underline decoration-1 underline-offset-2" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: "#0A0A0A" }}>{article.title}</h3>
-        {article.description && <p className="text-[13px] leading-relaxed mt-1 line-clamp-2" style={{ color: "#555" }}>{article.description}…</p>}
+        <h3 className="text-base sm:text-lg leading-[1.2] font-bold group-hover:underline decoration-1 underline-offset-2" style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>{article.title}</h3>
+        {article.description && <p className="text-[13px] leading-relaxed mt-1 line-clamp-2" style={{ color: theme.textMute }}>{article.description}…</p>}
       </article>
     </a>
   );
 }
 
-function MatchCard({ match, state, standings }) {
+function MatchCard({ match, state, standings, theme }) {
   const showScore = state === "live" || state === "finished";
   const homeScorers = (match.scorers || []).filter((s) => s.team === "home");
   const awayScorers = (match.scorers || []).filter((s) => s.team === "away");
 
-  // Pronostico se è una partita futura e abbiamo standings
   let prediction = null;
   if (state === "upcoming" && standings && standings.length > 0) {
     const homeStats = getTeamStats(match.homeId, match.home, standings);
@@ -942,8 +980,8 @@ function MatchCard({ match, state, standings }) {
   }
 
   return (
-    <div className="overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #D4C9B0" }}>
-      <div className="flex items-center justify-between px-3 py-1.5" style={{ background: state === "live" ? "#E91D5C" : "#F4EFE6" }}>
+    <div className="overflow-hidden" style={{ background: theme.cardBg, border: `1px solid ${theme.border}` }}>
+      <div className="flex items-center justify-between px-3 py-1.5" style={{ background: state === "live" ? "#E91D5C" : theme.cardHeader }}>
         {state === "live" ? (
           <div className="flex items-center gap-1.5 live-indicator">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-white" />
@@ -952,30 +990,29 @@ function MatchCard({ match, state, standings }) {
             </span>
           </div>
         ) : (
-          <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+          <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>
             {formatMatchDate(match.date)}
           </span>
         )}
         {match.scorers && match.scorers.length > 0 && (
-          <span className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold" style={{ color: state === "live" ? "#fff" : "#666", fontFamily: "system-ui, sans-serif" }}>
+          <span className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold" style={{ color: state === "live" ? "#fff" : theme.textMute, fontFamily: "system-ui, sans-serif" }}>
             <Target size={10} />
             {match.scorers.length}
           </span>
         )}
       </div>
       <div className="px-3 py-2.5 space-y-2">
-        <TeamRow team={match.home} teamId={match.homeId} badge={match.homeBadge} score={match.homeScore} showScore={showScore} scorers={homeScorers} state={state} />
-        <TeamRow team={match.away} teamId={match.awayId} badge={match.awayBadge} score={match.awayScore} showScore={showScore} scorers={awayScorers} state={state} />
+        <TeamRow team={match.home} teamId={match.homeId} badge={match.homeBadge} score={match.homeScore} showScore={showScore} scorers={homeScorers} state={state} theme={theme} />
+        <TeamRow team={match.away} teamId={match.awayId} badge={match.awayBadge} score={match.awayScore} showScore={showScore} scorers={awayScorers} state={state} theme={theme} />
       </div>
 
-      {/* Pronostico inline */}
       {prediction && (
-        <div className="px-3 py-1.5 flex items-center gap-2" style={{ background: "#FAFAFA", borderTop: "1px solid #E5DCC8" }}>
+        <div className="px-3 py-1.5 flex items-center gap-2" style={{ background: theme.matchHeaderBg, borderTop: `1px solid ${theme.borderSoft}` }}>
           <Sparkles size={11} style={{ color: "#9333EA" }} />
           <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: "#9333EA", fontFamily: "system-ui, sans-serif" }}>
             {prediction.result} · {prediction.score}
           </span>
-          <span className="text-[10px]" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+          <span className="text-[10px]" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>
             {prediction.label}
           </span>
         </div>
@@ -984,22 +1021,22 @@ function MatchCard({ match, state, standings }) {
   );
 }
 
-function TeamRow({ team, teamId, badge, score, showScore, scorers, state }) {
+function TeamRow({ team, teamId, badge, score, showScore, scorers, state, theme }) {
   const TeamWrap = teamId ? Link : "div";
   const teamProps = teamId ? { href: `/team/${teamId}` } : {};
   return (
     <div>
       <div className="flex items-center gap-2">
         {badge && <img src={badge} alt="" className="w-5 h-5 object-contain" loading="lazy" />}
-        <TeamWrap {...teamProps} className={teamId ? "flex-1 font-bold text-base truncate hover:underline decoration-1 underline-offset-2" : "flex-1 font-bold text-base truncate"} style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{team}</TeamWrap>
+        <TeamWrap {...teamProps} className={teamId ? "flex-1 font-bold text-base truncate hover:underline decoration-1 underline-offset-2" : "flex-1 font-bold text-base truncate"} style={{ fontFamily: "'Playfair Display', Georgia, serif", color: theme.text }}>{team}</TeamWrap>
         {showScore ? (
-          <span className="font-black text-xl tabular-nums" style={{ fontFamily: "system-ui, sans-serif", color: state === "live" ? "#E91D5C" : "#0A0A0A", minWidth: "1.5rem", textAlign: "right" }}>
+          <span className="font-black text-xl tabular-nums" style={{ fontFamily: "system-ui, sans-serif", color: state === "live" ? "#E91D5C" : theme.text, minWidth: "1.5rem", textAlign: "right" }}>
             {score ?? 0}
           </span>
-        ) : <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: "#888", fontFamily: "system-ui, sans-serif" }}>vs</span>}
+        ) : <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>vs</span>}
       </div>
       {scorers && scorers.length > 0 && (
-        <div className="ml-7 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]" style={{ color: "#666", fontFamily: "system-ui, sans-serif" }}>
+        <div className="ml-7 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]" style={{ color: theme.textMute, fontFamily: "system-ui, sans-serif" }}>
           {scorers.map((s, i) => (
             <span key={i} className="flex items-center gap-1">
               <span className="text-[8px]">⚽</span>
